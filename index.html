@@ -135,6 +135,19 @@
     <!-- Übersicht -->
     <section id="s-start">
       <div class="card">
+        <h3 style="margin-top:0">Tour – Kontrolle durch</h3>
+        <div class="grid">
+          <label class="f">Kontrollierende/r (wird gemerkt)
+            <input id="meinName" type="text" autocomplete="name">
+          </label>
+          <label class="f">Begleiter/in (wird gemerkt)
+            <input id="begleiter" type="text">
+          </label>
+        </div>
+        <p class="muted klein" style="margin:8px 0 0">Wird bei jeder Person der Tour vorausgefüllt (auch unten bei der Unterschrift).</p>
+      </div>
+
+      <div class="card">
         <div id="drop" tabindex="0">
           <strong>Stammdatenblätter laden</strong>
           <span class="muted">Ein oder mehrere PDFs (oder eine exportierte Tour-Datei) hier hineinziehen oder antippen</span>
@@ -163,9 +176,14 @@
       </div>
 
       <div class="card">
-        <label class="f">Dein Name als Kontrollierende/r (wird gemerkt)
-          <input id="meinName" type="text" autocomplete="name">
-        </label>
+        <h3 style="margin-top:0">Logo für das Protokoll</h3>
+        <p class="muted klein" style="margin-top:0">Wird oben links auf jedes Protokoll gedruckt. Es bleibt nur auf diesem Gerät gespeichert (auch auf dem iPad einmal auswählen).</p>
+        <div class="route" style="align-items:center">
+          <img id="logoVorschau" alt="" style="max-height:48px;max-width:160px;display:none;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff">
+          <button class="btn sec klein" type="button" id="logoWaehlen">Logo auswählen …</button>
+          <button class="btn sec klein versteckt" type="button" id="logoWeg">Logo entfernen</button>
+        </div>
+        <input id="logoIn" type="file" accept="image/png,image/jpeg" hidden>
       </div>
       <div class="card klein muted">
         Alles läuft nur in diesem Browser und wird nur hier gespeichert. Es wird nichts hochgeladen.
@@ -12813,7 +12831,7 @@ var qrcode = function() {
     var form = pdf.getForm();
     var W = 595.28, H = 841.89, mm = 72 / 25.4, RAND = 14 * mm;
     var SCHWARZ = rgb(0, 0, 0), GRAU = rgb(0.5, 0.5, 0.5), DUNKEL = rgb(0.2, 0.2, 0.2),
-      HELLGRAU = rgb(0.9, 0.9, 0.9), LINIE = rgb(0.73, 0.73, 0.73), FELD_RAND = rgb(0.48, 0.55, 0.65),
+      HELLGRAU = rgb(0.9, 0.9, 0.9), TABKOPF = rgb(0.94, 0.95, 0.965), LINIE = rgb(0.73, 0.73, 0.73), FELD_RAND = rgb(0.48, 0.55, 0.65),
       FELD_BG = rgb(0.933, 0.953, 0.98), HINWEIS = rgb(0.6, 0.66, 0.74);
     var page = null, y = 0, seite = 0;
     var S = !!optionen.werte;            // statisch: fertiger Bogen ohne Formularfelder
@@ -12860,14 +12878,15 @@ var qrcode = function() {
       return out;
     }
     // Bemerkungsfeld: im fertigen PDF wächst das Kästchen mit dem Text (ggf. auf neuer Seite)
-    function bemerkungsFeld(label) {
+    function bemerkungsFeld(label, eigenerAbschnitt) {
       var h = 62;
       if (S) {
         var z = umbrechen(WERTE.bemerkungen || "", F.n, 9, W - 2 * RAND - 6);
         h = Math.min(Math.max(62, z.length * 9 * 1.15 + 8), H - 60 * mm);
       }
-      if (y - 10 - h < 20 * mm) { neueSeite(); y -= 4; }
-      txt(RAND, y - 8, label, F.n, 7, GRAU);
+      if (y - 10 - h - (eigenerAbschnitt ? 22 : 0) < 20 * mm) { neueSeite(); y -= 4; }
+      if (eigenerAbschnitt) { abschnitt(label); y += 8; label = ""; }
+      if (label) txt(RAND, y - 8, label, F.n, 7, GRAU);
       feld("bemerkungen", RAND, y - 10 - h, W - 2 * RAND, h, true, 9);
       y -= 36 + h;
     }
@@ -12923,7 +12942,20 @@ var qrcode = function() {
     // Vorbelegung aus dem Stammdatenblatt (bleibt editierbar)
     var adresse = d.person.slice(1).filter(function (z) { return !/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(z); }).join(", ");
     var vor = { kontrolle_ort: adresse, anwesend: name, name_besitzer: name,
-      kontrolleur: optionen.kontrolleur || "", name_kontrolleur: optionen.kontrolleur || "" };
+      kontrolleur: optionen.kontrolleur || "", name_kontrolleur: optionen.kontrolleur || "", begleiter: optionen.begleiter || "" };
+    var LOGO = null;
+    if (optionen.logo && optionen.logo.length) {
+      try { LOGO = (optionen.logo[0] === 0x89) ? await pdf.embedPng(optionen.logo) : await pdf.embedJpg(optionen.logo); } catch (e) { LOGO = null; }
+    }
+    // einheitlicher Abschnittskopf (grauer Balken mit Nummer)
+    var KOPF = rgb(0.86, 0.885, 0.92), abschnittNr = 0;
+    function abschnitt(titel, jaNein) {
+      abschnittNr++;
+      page.drawRectangle({ x: RAND, y: y - 16, width: W - 2 * RAND, height: 16, color: KOPF });
+      txt(RAND + 6, y - 11.5, abschnittNr + ".  " + titel, F.b, 10);
+      if (jaNein) { txt(W - RAND - 61, y - 11, "Ja", F.b, 7.5); txt(W - RAND - 33, y - 11, "Nein", F.b, 7.5); }
+      y -= 22;
+    }
 
     // Wasserzeichen (Behörde + Dok-Nr., schräg, vielfach wiederholt) – auf die Fläche zugeschnitten
     var wzText = safe(((d.behoerde || "") + "  ·  Dok-Nr. " + (d.dok_nr || "") + "  ·  ").toUpperCase(), F.b);
@@ -12948,17 +12980,25 @@ var qrcode = function() {
       page = pdf.addPage([W, H]);
       seite++;
       y = H - RAND;
-      txt(RAND, y - 12, "Protokoll Aufbewahrungskontrolle (§ 36 Abs. 3 WaffG)", F.b, 13);
-      txtR(W - RAND, y - 12, name + "  ·  Dok-Nr. " + (d.dok_nr || ""), F.n, 8);
-      linie(RAND, y - 18, W - RAND, y - 18, 0.8, DUNKEL);
-      y -= 30;
+      var lx = RAND;
+      if (LOGO) {
+        var lh = 34, lw = LOGO.width * lh / LOGO.height;
+        if (lw > 120) { lw = 120; lh = LOGO.height * lw / LOGO.width; }
+        page.drawImage(LOGO, { x: RAND, y: y - 30 + (34 - lh) / 2, width: lw, height: lh });
+        lx = RAND + lw + 12;
+      }
+      txt(lx, y - 13, "Protokoll Aufbewahrungskontrolle (§ 36 Abs. 3 WaffG)", F.b, 13);
+      txt(lx, y - 26, fit([d.behoerde, name, "Dok-Nr. " + (d.dok_nr || "")].filter(Boolean).join("  ·  "), F.n, 8.5, W - RAND - lx), F.n, 8.5, DUNKEL);
+      linie(RAND, y - 34, W - RAND, y - 34, 0.8, DUNKEL);
+      y -= 44;
     }
 
     // ---- Seite 1: Kopfdaten
     neueSeite();
+    abschnitt("Waffenbesitzer/in und Erlaubnis");
+    y += 6;
     var x2 = W / 2 + 5, top = y;
-    txt(RAND, top - 10, "Waffenbesitzer/in", F.b, 9);
-    d.person.slice(0, 5).forEach(function (z, i) { txt(RAND, top - 23 - i * 11, z, F.n, 9.5); });
+    d.person.slice(0, 5).forEach(function (z, i) { txt(RAND + 6, top - 10 - i * 11, z, i === 0 ? F.b : F.n, 9.5); });
     [["Erlaubnis", d.erlaubnis], ["Dok-Nr.", d.dok_nr], ["Behörde", d.behoerde],
       ["Person-NWR-ID", d.person_nwr], ["Erlaubnis-NWR-ID", d.erlaubnis_nwr]].forEach(function (kv, i) {
       txt(x2, top - 10 - i * 11, kv[0] + ":", F.n, 8, GRAU);
@@ -12981,14 +13021,14 @@ var qrcode = function() {
         w0.dict.set(PDFLib.PDFName.of("F"), PDFLib.PDFNumber.of(0)); // wird nicht gedruckt
       });
     }
-    y = top - 10 - 5 * 11 - 12;
+    y = top - 10 - 5 * 11 - 8;
 
-    txt(RAND, y, "Angaben zur Kontrolle", F.b, 10);
-    y -= 6;
+    abschnitt("Angaben zur Kontrolle");
+    y += 4;
     var fh = 17, bb = W - 2 * RAND;
     [[["Datum", "kontrolle_datum", 0.22], ["Uhrzeit von", "kontrolle_von", 0.16], ["bis", "kontrolle_bis", 0.16],
       ["Ort der Kontrolle", "kontrolle_ort", 0.46]],
-     [["Kontrollierende/r", "kontrolleur", 0.5], ["Anwesende Person(en)", "anwesend", 0.5]]].forEach(function (reihe) {
+     [["Kontrollierende/r", "kontrolleur", 0.34], ["Begleiter/in", "begleiter", 0.33], ["Anwesende Person(en)", "anwesend", 0.33]]].forEach(function (reihe) {
       var x = RAND;
       reihe.forEach(function (r) {
         txt(x, y - 8, r[0], F.n, 7, GRAU);
@@ -12998,10 +13038,10 @@ var qrcode = function() {
       y -= 10 + fh + 6;
     });
     // ---- Kontrolle gestattet / verweigert
-    y -= 2;
+    y -= 4;
+    abschnitt("Kontrolle");
+    y += 24;
     var kh = 78;
-    page.drawRectangle({ x: RAND, y: y - kh, width: W - 2 * RAND, height: kh, color: rgb(0.93, 0.93, 0.93) });
-    txt(RAND + 8, y - 14, "Kontrolle", F.b, 10);
     var zgGruppe = null;
     function kaestchen(name, wert, x, yy, label) {
       var k = 10;
@@ -13022,22 +13062,21 @@ var qrcode = function() {
       }
       txt(x + k + 6, yy + 1.5, label, F.n, 9);
     }
-    var kx1 = RAND + 12, kx2 = RAND + 190;
+    var kx1 = RAND + 6, kx2 = RAND + 190;
     kaestchen("zugang", "Ja", kx1, y - 32, "gestattet");
     kaestchen("zugang", "Nein", kx2, y - 32, "verweigert");
     txt(kx2 - 34, y - 50 + 1.5, "wegen", F.n, 9);
     GRUENDE.forEach(function (g, i) { kaestchen(g[0], null, kx2 + i * 105, y - 50, g[1]); });
-    txt(RAND + 12, y - 68 + 1.5, "sonstiger Grund (bitte benennen):", F.n, 9);
+    txt(RAND + 6, y - 68 + 1.5, "sonstiger Grund (bitte benennen):", F.n, 9);
     feld("grund_sonstig", RAND + 170, y - 71, W - 2 * RAND - 178, 14, false, 9);
-    y -= kh + 4;
+    linie(RAND, y - kh + 2, W - RAND, y - kh + 2, 0.3, rgb(0.87, 0.87, 0.87));
+    y -= kh - 2;
 
     var xjS = W - RAND - 55;
-    y -= 4;
-    txt(xjS - 6, y, "Ja", F.b, 7.5);
-    txt(xjS + 22, y, "Nein", F.b, 7.5);
-    y -= 4;
+    txt(xjS - 6, y - 10, "Ja", F.b, 7.5); txt(xjS + 22, y - 10, "Nein", F.b, 7.5);
+    y -= 10;
     FRAGEN_START.forEach(function (fr) {
-      txt(RAND, y - 12, fr[1], F.n, 9);
+      txt(RAND + 6, y - 12, fr[1], F.n, 9);
       jn(fr[0], xjS, y - 15);
       linie(RAND, y - 18, W - RAND, y - 18, 0.3, rgb(0.87, 0.87, 0.87));
       y -= 19;
@@ -13050,7 +13089,7 @@ var qrcode = function() {
       txt(RAND + 10, y - 25, "Die Aufbewahrungskontrolle konnte nicht durchgeführt werden.", F.n, 9);
       y -= 30;
     }
-    y -= 14;
+    y -= 16;
 
     if (!VERWEIGERT) {
     // ---- Tabelle
@@ -13060,10 +13099,11 @@ var qrcode = function() {
     cols.push(["Bemerkung", W - 2 * RAND - summe]);
     var xs = [RAND];
     cols.forEach(function (c) { xs.push(xs[xs.length - 1] + c[1]); });
+    var tabErst = true;
     function tabKopf() {
-      txt(RAND, y, "Vorhandensein der eingetragenen Waffen und Waffenteile", F.b, 10);
-      y -= 6;
-      page.drawRectangle({ x: RAND, y: y - 14, width: W - 2 * RAND, height: 14, color: HELLGRAU });
+      if (tabErst) { abschnitt("Waffen und Waffenteile laut Stammdatenblatt"); tabErst = false; y += 4; }
+      else { txt(RAND, y - 8, "Waffen und Waffenteile (Fortsetzung)", F.b, 9); y -= 14; }
+      page.drawRectangle({ x: RAND, y: y - 14, width: W - 2 * RAND, height: 14, color: TABKOPF });
       cols.forEach(function (c, i) { txt(xs[i] + 3, y - 10, c[0], F.b, 7.5); });
       txt(xs[4] + 3, y - 22, "vorhanden?", F.i, 6.5, GRAU);
       y -= 26;
@@ -13095,10 +13135,11 @@ var qrcode = function() {
     var mcols = [["Kaliber", 220], ["Ja", 30], ["Nein", 30]];
     var mxs = [RAND];
     mcols.forEach(function (c) { mxs.push(mxs[mxs.length - 1] + c[1]); });
+    var munErst = true;
     function munKopf() {
-      txt(RAND, y, "Munition", F.b, 10);
-      y -= 6;
-      page.drawRectangle({ x: RAND, y: y - 14, width: mxs[mxs.length - 1] - RAND, height: 14, color: HELLGRAU });
+      if (munErst) { abschnitt("Munition"); munErst = false; y += 4; }
+      else { txt(RAND, y - 8, "Munition (Fortsetzung)", F.b, 9); y -= 14; }
+      page.drawRectangle({ x: RAND, y: y - 14, width: mxs[mxs.length - 1] - RAND, height: 14, color: TABKOPF });
       mcols.forEach(function (c, i) { txt(mxs[i] + 3, y - 10, c[0], F.b, 7.5); });
       txt(mxs[1] + 3, y - 22, "vorhanden?", F.i, 6.5, GRAU);
       y -= 24;
@@ -13133,13 +13174,11 @@ var qrcode = function() {
     // ---- Aufbewahrung
     var bedarf = 14 + FRAGEN.length * 19 + 30 + 18 + 20 + 70;
     if (y - bedarf < 20 * mm) { neueSeite(); y -= 4; }
-    txt(RAND, y, "Aufbewahrung", F.b, 10);
+    abschnitt("Aufbewahrung", true);
+    y += 6;
     var xj = W - RAND - 55;
-    txt(xj - 6, y, "Ja", F.b, 7.5);
-    txt(xj + 22, y, "Nein", F.b, 7.5);
-    y -= 6;
     FRAGEN.forEach(function (fr, i) {
-      txt(RAND, y - 12, (i + 1) + ".  " + fr, F.n, 9);
+      txt(RAND + 6, y - 12, fr, F.n, 9);
       jn("frage" + ("0" + (i + 1)).slice(-2), xj, y - 15);
       linie(RAND, y - 18, W - RAND, y - 18, 0.3, rgb(0.87, 0.87, 0.87));
       y -= 19;
@@ -13154,14 +13193,13 @@ var qrcode = function() {
     y -= 36;
     bemerkungsFeld("Bemerkungen / festgestellte Mängel / Auflagen");
     } else {
-      y -= 6;
-      bemerkungsFeld("Bemerkungen");
+      bemerkungsFeld("Bemerkungen", true);
     }
 
     // ---- Unterschriften
-    if (y - 190 < 20 * mm) neueSeite();
-    txt(RAND, y, "Bestätigung", F.b, 10);
-    y -= 14;
+    if (y - 200 < 20 * mm) neueSeite();
+    abschnitt("Bestätigung");
+    y -= 2;
     txt(RAND, y, VERWEIGERT ? "Die obigen Angaben sind zutreffend." : "Die Kontrolle wurde in meinem Beisein durchgeführt. Die obigen Angaben sind zutreffend.", F.n, 8.5);
     y -= 10;
     var sb = (W - 2 * RAND - 16) / 2, sh = 62, sigs = [];
@@ -13511,7 +13549,10 @@ var qrcode = function() {
   });
   document.addEventListener("input", function (e) {
     var n = e.target.getAttribute && e.target.getAttribute("data-name");
-    if (n && st && !st.fertig) { st.werte[n] = e.target.value; speichern(); }
+    if (n && st && !st.fertig) {
+      if (n === "kontrolleur" && (!st.werte.name_kontrolleur || st.werte.name_kontrolleur === st.werte.kontrolleur)) st.werte.name_kontrolleur = e.target.value;
+      st.werte[n] = e.target.value; speichern();
+    }
     if (e.target.tagName === "TEXTAREA") wachsen(e.target);
   });
 
@@ -13522,6 +13563,42 @@ var qrcode = function() {
   var meinName = $("meinName");
   meinName.value = lsGet("wk_kontrolleur") || "";
   meinName.addEventListener("input", function () { lsSet("wk_kontrolleur", meinName.value); });
+  var begleiterIn = $("begleiter");
+  begleiterIn.value = lsGet("wk_begleiter") || "";
+  begleiterIn.addEventListener("input", function () { lsSet("wk_begleiter", begleiterIn.value); });
+  // Besetzung in alle noch nicht begonnenen Kontrollen übernehmen
+  function besetzungUebernehmen() {
+    liste.forEach(function (p) {
+      if (p.status !== "offen" || p.fertig) return;
+      p.werte.kontrolleur = meinName.value.trim(); p.werte.name_kontrolleur = meinName.value.trim();
+      p.werte.begleiter = begleiterIn.value.trim(); dbPut(p);
+    });
+  }
+  meinName.addEventListener("change", besetzungUebernehmen);
+  begleiterIn.addEventListener("change", besetzungUebernehmen);
+  // Logo (nur lokal gespeichert)
+  function logoBytes() { var u = lsGet("wk_logo"); return u ? unb64(u.split(",")[1]) : null; }
+  function logoZeigen() {
+    var u = lsGet("wk_logo"), im = $("logoVorschau");
+    im.style.display = u ? "" : "none"; if (u) im.src = u;
+    $("logoWeg").classList.toggle("versteckt", !u);
+  }
+  $("logoWaehlen").onclick = function () { $("logoIn").click(); };
+  $("logoWeg").onclick = function () { try { localStorage.removeItem("wk_logo"); } catch (e) {} logoZeigen(); };
+  $("logoIn").addEventListener("change", function () {
+    var f = this.files[0]; this.value = ""; if (!f) return;
+    var im = new Image(), url = URL.createObjectURL(f);
+    im.onload = function () {
+      // verkleinern und als PNG speichern (passt sicher in den Speicher)
+      var sk = Math.min(1, 600 / Math.max(im.width, im.height)), c = document.createElement("canvas");
+      c.width = Math.round(im.width * sk); c.height = Math.round(im.height * sk);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      lsSet("wk_logo", c.toDataURL("image/png")); URL.revokeObjectURL(url); logoZeigen();
+    };
+    im.onerror = function () { hinweis("Das Bild konnte nicht gelesen werden (PNG oder JPG verwenden)."); };
+    im.src = url;
+  });
+  logoZeigen();
 
   var drop = $("drop"), datei = $("datei");
   drop.addEventListener("click", function () { datei.click(); });
@@ -13566,7 +13643,8 @@ var qrcode = function() {
         if (liste.some(function (p) { return p.id === id; })) { doppelt.push(d.person[0] || files[i].name); continue; }
         var name = d.person[0] || "";
         var p = { id: id, daten: d, original: bytes, dateiname: files[i].name,
-          werte: { kontrolle_ort: adresse(d), anwesend: name, name_besitzer: name },
+          werte: { kontrolle_ort: adresse(d), anwesend: name, name_besitzer: name,
+            kontrolleur: meinName.value.trim(), name_kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim() },
           sig: {}, schritt: 1, status: "offen", fertig: false, reihenfolge: Date.now() + i };
         liste.push(p); await dbPut(p); neu++;
       } catch (e) { console.error(e); fehler.push(files[i].name + ": " + (e.message || e)); }
@@ -13632,6 +13710,7 @@ var qrcode = function() {
     if (!offen.length) { hinweis("Keine offenen Kontrollen in der Liste."); return; }
     var jetzt = new Date();
     var tour = { tourId: "tour-" + jetzt.getTime(), erstellt: jetzt.toISOString(), kontrolleur: meinName.value.trim(),
+      begleiter: begleiterIn.value.trim(), logo: lsGet("wk_logo") || null,
       personen: offen.map(function (p) {
         return { id: p.id, daten: p.daten, original: p.original ? b64(p.original) : null, dateiname: p.dateiname, werte: p.werte, sig: p.sig || {},
           schritt: p.schritt || 1, status: p.status, reihenfolge: p.reihenfolge };
@@ -13677,7 +13756,7 @@ var qrcode = function() {
     var offen = liste.filter(function (p) { return !p.fertig; });
     if (!offen.length) { hinweis("Keine offenen Kontrollen in der Liste."); return; }
     var jetzt = new Date();
-    var tour = { tourId: "tour-" + jetzt.getTime(), erstellt: jetzt.toISOString(), kontrolleur: meinName.value.trim(), qr: true,
+    var tour = { tourId: "tour-" + jetzt.getTime(), erstellt: jetzt.toISOString(), kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim(), qr: true,
       personen: offen.map(function (p) { return { id: p.id, daten: p.daten, werte: p.werte, reihenfolge: p.reihenfolge }; }) };
     var daten = await packen(tour), n = Math.ceil(daten.length / QR_TEIL), kennung = Math.random().toString(36).slice(2, 8);
     var teile = [];
@@ -13767,7 +13846,9 @@ var qrcode = function() {
       var p = Object.assign({ sig: {}, schritt: 1, status: "offen" }, q, { original: q.original ? unb64(q.original) : null, fertig: false });
       liste.push(p); await dbPut(p); neu++;
     }
-    if (tour.kontrolleur && !meinName.value) { meinName.value = tour.kontrolleur; lsSet("wk_kontrolleur", tour.kontrolleur); }
+    if (tour.kontrolleur) { meinName.value = tour.kontrolleur; lsSet("wk_kontrolleur", tour.kontrolleur); }
+    if (tour.begleiter != null) { begleiterIn.value = tour.begleiter; lsSet("wk_begleiter", tour.begleiter); }
+    if (tour.logo && !lsGet("wk_logo")) { lsSet("wk_logo", tour.logo); logoZeigen(); }
     if (schon.indexOf(tour.tourId) < 0) lsSet("wk_touren", schon.concat(tour.tourId).filter(Boolean).join(","));
     meldung($("startMeldung"), "ok", "Tour vom " + new Date(tour.erstellt).toLocaleDateString("de-DE") + " geladen: " + neu + " Person(en) neu" +
       (tour.personen.length - neu ? ", " + (tour.personen.length - neu) + " waren schon in der Liste" : "") + ".");
@@ -13783,7 +13864,8 @@ var qrcode = function() {
       if (!w.kontrolle_datum) w.kontrolle_datum = heute();
       if (!w.kontrolle_von) w.kontrolle_von = jetztZeit();
       if (!w.kontrolleur) w.kontrolleur = meinName.value.trim();
-      if (!w.name_kontrolleur) w.name_kontrolleur = meinName.value.trim();
+      if (!w.name_kontrolleur) w.name_kontrolleur = w.kontrolleur || meinName.value.trim();
+      if (!w.begleiter) w.begleiter = begleiterIn.value.trim();
       speichern();
     }
     zeigeSchritt(st.schritt || 1);
@@ -13881,6 +13963,7 @@ var qrcode = function() {
       '</div><div class="grid" style="margin-top:12px">' +
       inputHtml("kontrolle_ort", "Ort der Kontrolle") +
       inputHtml("kontrolleur", "Kontrollierende/r") +
+      inputHtml("begleiter", "Begleiter/in") +
       inputHtml("anwesend", "Anwesende Person(en)") +
       '</div></div>' +
       '<div class="card"><h3>Kontrolle</h3>' +
@@ -14016,6 +14099,7 @@ var qrcode = function() {
 
   // ---------- Schritt 5
   function schritt5(el) {
+    if (!st.werte.name_kontrolleur && st.werte.kontrolleur) { st.werte.name_kontrolleur = st.werte.kontrolleur; speichern(); }
     var wz = ((st.daten.behoerde || "") + "  ·  DOK-NR. " + (st.daten.dok_nr || "") + "  ·  ").toUpperCase();
     var wzBlock = new Array(40).join(new Array(8).join(wz) + "\n");
     el.innerHTML = '<h2>Unterschriften</h2>' +
@@ -14120,7 +14204,7 @@ var qrcode = function() {
         });
         var sig = {};
         ["besitzer", "kontrolleur"].forEach(function (k) { if (st.sig[k]) sig[k] = unb64(st.sig[k].split(",")[1]); });
-        var r = await WK.abschliessen(PDFLib, st.daten, st.original, werte, sig, { anlage: $("anlage").checked });
+        var r = await WK.abschliessen(PDFLib, st.daten, st.original, werte, sig, { anlage: $("anlage").checked, logo: logoBytes() });
         st.fertig = true; st.status = "fertig"; st.pdf = r.bytes;
         st.ergebnis = { name: r.name, hash: r.hash, vermerk: werte.abschluss_vermerk, nichtVorhanden: fehlend.length, verweigert: vw };
         clearTimeout(speicherTimer); await dbPut(st);
@@ -14163,7 +14247,7 @@ var qrcode = function() {
     for (var i = 0; i < fs.length; i++) {
       var li = wEintrag(fs[i].name + " …");
       try {
-        var r = await WK.verarbeiten(pdfjs, PDFLib, new Uint8Array(await fs[i].arrayBuffer()), { kontrolleur: meinName.value.trim() });
+        var r = await WK.verarbeiten(pdfjs, PDFLib, new Uint8Array(await fs[i].arrayBuffer()), { kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim(), logo: logoBytes() });
         herunterladen(r.bytes, r.name); li.textContent = "✓ " + r.name;
       } catch (e) { li.textContent = "Fehler bei " + fs[i].name + ": " + (e.message || e); }
     }
