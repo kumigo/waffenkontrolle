@@ -140,6 +140,8 @@
           <span class="muted">Ein oder mehrere PDFs (oder eine exportierte Tour-Datei) hier hineinziehen oder antippen</span>
         </div>
         <input id="datei" type="file" accept="application/pdf,.pdf,text/html,.html,.htm" multiple hidden>
+        <input id="ordner" type="file" webkitdirectory multiple hidden>
+        <button class="btn" type="button" id="ordnerBtn" style="width:100%;margin-top:10px">📁 Ganzen Ordner mit Stammdatenblättern laden</button>
         <button class="btn sec" type="button" id="qrScan" style="width:100%;margin-top:10px">📷 Tour per QR-Code scannen</button>
         <div id="startMeldung"></div>
       </div>
@@ -13496,6 +13498,16 @@ var qrcode = function() {
 
   var drop = $("drop"), datei = $("datei");
   drop.addEventListener("click", function () { datei.click(); });
+  var ordner = $("ordner"), iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (iOS || !("webkitdirectory" in ordner)) $("ordnerBtn").classList.add("versteckt");
+  else $("qrScan").classList.add("versteckt");
+  $("ordnerBtn").onclick = function () { ordner.click(); };
+  ordner.addEventListener("change", function () {
+    var f = Array.prototype.slice.call(ordner.files).filter(function (x) { return /\.pdf$/i.test(x.name); });
+    ordner.value = "";
+    if (!f.length) { meldung($("startMeldung"), "warn", "In diesem Ordner sind keine PDF-Dateien."); return; }
+    laden(f);
+  });
   datei.addEventListener("change", function () { laden(Array.prototype.slice.call(datei.files)); datei.value = ""; });
   ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
   ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
