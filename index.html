@@ -52,6 +52,9 @@
   .zeile .was { flex:1; min-width:200px; }
   .zeile .was b { display:block; }
   .teil { padding-left:18px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { border:1px solid #b9c4d2; background:#fff; border-radius:999px; padding:10px 16px; min-height:44px; font-size:15px; font-weight:600; color:var(--muted); cursor:pointer; }
+  .chip.an { background:var(--err); border-color:var(--err); color:#fff; }
   .teile-btn { display:flex; width:100%; justify-content:space-between; align-items:center; gap:10px; margin-top:6px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:#f6f8fb; font-weight:600; font-size:15px; cursor:pointer; color:var(--text); }
   .teile-btn .pfeil { display:inline-block; transition:transform .15s; }
   .teile-btn.auf .pfeil { transform:rotate(90deg); }
@@ -262,10 +265,11 @@
   var FRAGEN = [
     "Mängel festgestellt",
   ];
-  // Fragen zum Zugang (Startseite). Bei zugang = "Nein" entfällt die Prüfung der Waffen/Munition/Aufbewahrung.
+  // Kontrolle gestattet (zugang = "Ja") / verweigert (zugang = "Nein") – bei "Nein" entfällt die Prüfung der Waffen/Munition/Aufbewahrung.
+  var GRUENDE = [["grund_erkrankung", "Erkrankung"], ["grund_termin", "anderer Termin"], ["grund_gaeste", "Gästen"]];
+  // Weitere Ja/Nein-Fragen auf der Startseite
   var FRAGEN_START = [
     ["angemeldet", "Die Kontrolle war angemeldet"],
-    ["zugang", "Zugang zur Aufbewahrungsstelle wurde gewährt"],
     ["bewohnt", "Die Aufbewahrungsstelle ist bewohnt"],
   ];
 
@@ -566,6 +570,40 @@
       });
       y -= 10 + fh + 6;
     });
+    // ---- Kontrolle gestattet / verweigert
+    y -= 2;
+    var kh = 78;
+    page.drawRectangle({ x: RAND, y: y - kh, width: W - 2 * RAND, height: kh, color: rgb(0.93, 0.93, 0.93) });
+    txt(RAND + 8, y - 14, "Kontrolle", F.b, 10);
+    var zgGruppe = null;
+    function kaestchen(name, wert, x, yy, label) {
+      var k = 10;
+      if (S) {
+        var an = wert === null ? WERTE[name] === "X" : WERTE[name] === wert;
+        page.drawRectangle({ x: x, y: yy, width: k, height: k, color: rgb(1, 1, 1), borderColor: DUNKEL, borderWidth: 0.8 });
+        if (an) {
+          linie(x + 2, yy + 2, x + k - 2, yy + k - 2, 1.3, DUNKEL);
+          linie(x + 2, yy + k - 2, x + k - 2, yy + 2, 1.3, DUNKEL);
+        }
+      } else if (wert === null) {
+        form.createCheckBox(name).addToPage(page, { x: x, y: yy, width: k, height: k, textColor: SCHWARZ,
+          backgroundColor: rgb(1, 1, 1), borderColor: DUNKEL, borderWidth: 0.8 });
+      } else {
+        if (!zgGruppe) zgGruppe = form.createRadioGroup(name);
+        zgGruppe.addOptionToPage(wert, page, { x: x, y: yy, width: k, height: k, textColor: SCHWARZ,
+          backgroundColor: rgb(1, 1, 1), borderColor: DUNKEL, borderWidth: 0.8 });
+      }
+      txt(x + k + 6, yy + 1.5, label, F.n, 9);
+    }
+    var kx1 = RAND + 12, kx2 = RAND + 190;
+    kaestchen("zugang", "Ja", kx1, y - 32, "gestattet");
+    kaestchen("zugang", "Nein", kx2, y - 32, "verweigert");
+    txt(kx2 - 34, y - 50 + 1.5, "wegen", F.n, 9);
+    GRUENDE.forEach(function (g, i) { kaestchen(g[0], null, kx2 + i * 105, y - 50, g[1]); });
+    txt(RAND + 12, y - 68 + 1.5, "sonstiger Grund (bitte benennen):", F.n, 9);
+    feld("grund_sonstig", RAND + 170, y - 71, W - 2 * RAND - 178, 14, false, 9);
+    y -= kh + 4;
+
     var xjS = W - RAND - 55;
     y -= 4;
     txt(xjS - 6, y, "Ja", F.b, 7.5);
@@ -581,7 +619,7 @@
     if (VERWEIGERT) {
       y -= 8;
       page.drawRectangle({ x: RAND, y: y - 30, width: W - 2 * RAND, height: 30, color: rgb(0.99, 0.93, 0.92), borderColor: rgb(0.70, 0.15, 0.12), borderWidth: 1 });
-      txt(RAND + 10, y - 13, "Zugang verweigert", F.b, 10, rgb(0.70, 0.15, 0.12));
+      txt(RAND + 10, y - 13, "Kontrolle verweigert", F.b, 10, rgb(0.70, 0.15, 0.12));
       txt(RAND + 10, y - 25, "Die Aufbewahrungskontrolle konnte nicht durchgeführt werden.", F.n, 9);
       y -= 30;
     }
@@ -895,7 +933,7 @@
   }
 
   global.Waffenkontrolle = { sha256js: sha256js, verarbeiten: verarbeiten, einfrieren: einfrieren, lesen: lesen, abschliessen: abschliessen,
-    kaliberListe: kaliberListe, dateiname: dateiname, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, EXTRA_KALIBER: 3 };
+    kaliberListe: kaliberListe, dateiname: dateiname, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, GRUENDE: GRUENDE, EXTRA_KALIBER: 3 };
 })(typeof window !== "undefined" ? window : globalThis);
 
 </script>
@@ -1017,6 +1055,12 @@
   }
 
   document.addEventListener("click", function (e) {
+    var c = e.target.closest(".chip[data-chip]");
+    if (c && st && !st.fertig) {
+      var cn = c.getAttribute("data-chip");
+      st.werte[cn] = st.werte[cn] === "X" ? "" : "X"; c.classList.toggle("an", st.werte[cn] === "X"); speichern();
+      return;
+    }
     var b = e.target.closest(".jn button");
     if (b && st && !st.fertig) {
       var grp = b.parentNode, name = grp.getAttribute("data-name"), v = b.getAttribute("data-v");
@@ -1197,6 +1241,7 @@
   function offen() {
     var d = st.daten, w = st.werte, o = { start: 0, waffen: 0, munition: 0, fragen: 0, sig: 0 };
     WK.FRAGEN_START.forEach(function (f) { if (!w[f[0]]) o.start++; });
+    if (!w.zugang) o.start++;
     if (w.zugang === "Nein") { if (!st.sig.kontrolleur) o.sig++; return o; }
     d.items.forEach(function (it, i) { if (!w["pos" + pos(i) + "_vorhanden"]) o.waffen++; });
     var kl = WK.kaliberListe(d);
@@ -1281,16 +1326,24 @@
       inputHtml("kontrolleur", "Kontrollierende/r") +
       inputHtml("anwesend", "Anwesende Person(en)") +
       '</div></div>' +
-      '<div class="card"><h3>Zugang</h3>' +
+      '<div class="card"><h3>Kontrolle</h3>' +
+      '<div class="zeile"><div class="was">Kontrolle wurde …</div><span class="jn" data-name="zugang">' +
+      '<button type="button" class="ja' + (st.werte.zugang === "Ja" ? " an" : "") + '" data-v="Ja" style="width:110px">gestattet</button>' +
+      '<button type="button" class="nein' + (st.werte.zugang === "Nein" ? " an" : "") + '" data-v="Nein" style="width:110px">verweigert</button></span></div>' +
+      '<div id="verweigertBox"></div>' +
       WK.FRAGEN_START.map(function (f) { return '<div class="zeile"><div class="was">' + esc(f[1]) + '</div>' + jnHtml(f[0]) + '</div>'; }).join("") +
-      '<div id="verweigertBox"></div></div>';
+      '</div>';
     verweigertBox();
   }
   function verweigert() { return !!st && st.werte.zugang === "Nein"; }
   function verweigertBox() {
     var b = $("verweigertBox"); if (!b) return;
-    b.innerHTML = verweigert() ? '<div class="hinweisbox err" style="margin-top:12px"><b>Zugang verweigert:</b> Die Schritte Waffen, Munition und Aufbewahrung entfallen. ' +
-      'Mit „Weiter“ geht es direkt zu den Unterschriften.</div>' : "";
+    if (!verweigert()) { b.innerHTML = ""; return; }
+    b.innerHTML = '<div style="padding:4px 0 12px"><div class="muted klein" style="margin-bottom:8px">wegen</div><div class="chips">' +
+      WK.GRUENDE.map(function (g) { return '<button type="button" class="chip' + (st.werte[g[0]] === "X" ? " an" : "") + '" data-chip="' + g[0] + '">' + esc(g[1]) + '</button>'; }).join("") +
+      '</div><div style="margin-top:10px">' + inputHtml("grund_sonstig", "sonstiger Grund (bitte benennen)") + '</div>' +
+      '<div class="hinweisbox err" style="margin:12px 0 0"><b>Kontrolle verweigert:</b> Die Schritte Waffen, Munition und Aufbewahrung entfallen. ' +
+      'Mit „Weiter“ geht es direkt zu den Unterschriften.</div></div>';
   }
 
   // ---------- Schritt 2
@@ -1473,7 +1526,7 @@
   function schritt6(el) {
     if (st.fertig) return abschlussFertig(el);
     var o = offen(), probleme = [], vw = verweigert();
-    if (o.start) probleme.push(o.start + " Frage(n) zum Zugang offen (Schritt 1)");
+    if (o.start) probleme.push(o.start + " Angabe(n) zur Kontrolle offen (Schritt 1)");
     if (o.waffen) probleme.push(o.waffen + " Waffe(n)/Waffenteil(e) ohne Ja/Nein (Schritt 2)");
     if (o.munition) probleme.push(o.munition + " Kaliber ohne Ja/Nein (Schritt 3)");
     if (o.fragen) probleme.push(o.fragen + " Frage(n) zur Aufbewahrung offen (Schritt 4)");
@@ -1481,7 +1534,7 @@
     if (!st.sig.kontrolleur) probleme.push("Unterschrift Kontrollierende/r fehlt (Schritt 5)");
     var fehlend = vw ? [] : st.daten.items.filter(function (it, i) { return st.werte["pos" + pos(i) + "_vorhanden"] === "Nein"; });
     el.innerHTML = '<h2>Abschluss</h2>' +
-      (vw ? '<div class="hinweisbox err"><b>Zugang verweigert.</b> Das Protokoll enthält keine Prüfung der Waffen, Munition und Aufbewahrung.' +
+      (vw ? '<div class="hinweisbox err"><b>Kontrolle verweigert.</b> Das Protokoll enthält keine Prüfung der Waffen, Munition und Aufbewahrung.' +
         (st.sig.besitzer ? "" : " Die Unterschrift der Waffenbesitzerin / des Waffenbesitzers ist in diesem Fall freiwillig.") + '</div>' : "") +
       (probleme.length ? '<div class="hinweisbox warn"><b>Noch offen:</b><ul>' + probleme.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + '</ul></div>'
         : '<div class="hinweisbox ok"><b>Alles ausgefüllt.</b></div>') +
