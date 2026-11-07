@@ -52,6 +52,14 @@
   .zeile .was { flex:1; min-width:200px; }
   .zeile .was b { display:block; }
   .teil { padding-left:18px; }
+  .teile-btn { display:flex; width:100%; justify-content:space-between; align-items:center; gap:10px; margin-top:6px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:#f6f8fb; font-weight:600; font-size:15px; cursor:pointer; color:var(--text); }
+  .teile-btn .pfeil { display:inline-block; transition:transform .15s; }
+  .teile-btn.auf .pfeil { transform:rotate(90deg); }
+  .teile-stand { font-weight:400; font-size:13px; color:var(--muted); }
+  .teile-stand.ok { color:var(--ok); }
+  .teile-stand.nein { color:var(--err); }
+  .treffer { background:#fff6c7; border-radius:8px; }
+  .suche { width:100%; padding:12px 14px; font-size:16px; border:1px solid #b9c4d2; border-radius:10px; margin:4px 0 12px; }
   .jn { display:inline-flex; border:1px solid #b9c4d2; border-radius:10px; overflow:hidden; }
   .jn button { border:0; background:#fff; padding:10px 0; width:76px; min-height:46px; cursor:pointer; font-weight:600; color:var(--muted); }
   .jn button + button { border-left:1px solid #b9c4d2; }
@@ -252,10 +260,13 @@
 
   // Fragen zur Aufbewahrung (Ja/Nein) – hier frei anpassbar
   var FRAGEN = [
-    "Die Kontrolle war angemeldet",
-    "Zugang zur Aufbewahrungsstelle wurde gewährt",
-    "Die Aufbewahrungsstelle ist bewohnt",
     "Mängel festgestellt",
+  ];
+  // Fragen zum Zugang (Startseite). Bei zugang = "Nein" entfällt die Prüfung der Waffen/Munition/Aufbewahrung.
+  var FRAGEN_START = [
+    ["angemeldet", "Die Kontrolle war angemeldet"],
+    ["zugang", "Zugang zur Aufbewahrungsstelle wurde gewährt"],
+    ["bewohnt", "Die Aufbewahrungsstelle ist bewohnt"],
   ];
 
   var NWR_ITEM = /^[WT]\d{4}-\d{2}-\d{2}-\d{7}-[A-Z]$/;
@@ -555,8 +566,28 @@
       });
       y -= 10 + fh + 6;
     });
-    y -= 10;
+    var xjS = W - RAND - 55;
+    y -= 4;
+    txt(xjS - 6, y, "Ja", F.b, 7.5);
+    txt(xjS + 22, y, "Nein", F.b, 7.5);
+    y -= 4;
+    FRAGEN_START.forEach(function (fr) {
+      txt(RAND, y - 12, fr[1], F.n, 9);
+      jn(fr[0], xjS, y - 15);
+      linie(RAND, y - 18, W - RAND, y - 18, 0.3, rgb(0.87, 0.87, 0.87));
+      y -= 19;
+    });
+    var VERWEIGERT = S && WERTE.zugang === "Nein";
+    if (VERWEIGERT) {
+      y -= 8;
+      page.drawRectangle({ x: RAND, y: y - 30, width: W - 2 * RAND, height: 30, color: rgb(0.99, 0.93, 0.92), borderColor: rgb(0.70, 0.15, 0.12), borderWidth: 1 });
+      txt(RAND + 10, y - 13, "Zugang verweigert", F.b, 10, rgb(0.70, 0.15, 0.12));
+      txt(RAND + 10, y - 25, "Die Aufbewahrungskontrolle konnte nicht durchgeführt werden.", F.n, 9);
+      y -= 30;
+    }
+    y -= 14;
 
+    if (!VERWEIGERT) {
     // ---- Tabelle
     var cols = [["Nr.", 20], ["Gegenstand / Waffenart", 118], ["Hersteller/Modell · Kaliber", 108],
       ["Seriennr. · NWR-ID", 108], ["Ja", 30], ["Nein", 30]];
@@ -659,12 +690,18 @@
     txt(RAND, y - 8, "Bemerkungen / festgestellte Mängel / Auflagen", F.n, 7, GRAU);
     feld("bemerkungen", RAND, y - 10 - 62, bb, 62, true, 9);
     y -= 98;
+    } else {
+      y -= 6;
+      txt(RAND, y - 8, "Bemerkungen", F.n, 7, GRAU);
+      feld("bemerkungen", RAND, y - 10 - 62, bb, 62, true, 9);
+      y -= 98;
+    }
 
     // ---- Unterschriften
     if (y - 190 < 20 * mm) neueSeite();
     txt(RAND, y, "Bestätigung", F.b, 10);
     y -= 14;
-    txt(RAND, y, "Die Kontrolle wurde in meinem Beisein durchgeführt. Die obigen Angaben sind zutreffend.", F.n, 8.5);
+    txt(RAND, y, VERWEIGERT ? "Die obigen Angaben sind zutreffend." : "Die Kontrolle wurde in meinem Beisein durchgeführt. Die obigen Angaben sind zutreffend.", F.n, 8.5);
     y -= 10;
     var sb = (W - 2 * RAND - 16) / 2, sh = 62, sigs = [];
     [["Waffenbesitzer/in", "besitzer"], ["Kontrollierende/r", "kontrolleur"]].forEach(function (r, i) {
@@ -858,7 +895,7 @@
   }
 
   global.Waffenkontrolle = { sha256js: sha256js, verarbeiten: verarbeiten, einfrieren: einfrieren, lesen: lesen, abschliessen: abschliessen,
-    kaliberListe: kaliberListe, dateiname: dateiname, FRAGEN: FRAGEN, EXTRA_KALIBER: 3 };
+    kaliberListe: kaliberListe, dateiname: dateiname, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, EXTRA_KALIBER: 3 };
 })(typeof window !== "undefined" ? window : globalThis);
 
 </script>
@@ -986,6 +1023,8 @@
       st.werte[name] = st.werte[name] === v ? "" : v;
       grp.querySelectorAll("button").forEach(function (x) { x.classList.toggle("an", x.getAttribute("data-v") === st.werte[name]); });
       speichern(); navAktualisieren();
+      if (name === "zugang") verweigertBox();
+      if (st.schritt === 2) teileStand();
     }
   });
   document.addEventListener("input", function (e) {
@@ -1135,6 +1174,7 @@
   }
 
   function kontrolleOeffnen(p) {
+    offeneGruppen = {};
     st = p;
     if (st.status === "offen") {
       st.status = "begonnen";
@@ -1155,7 +1195,9 @@
     nav.querySelectorAll("button").forEach(function (b) { b.onclick = function () { if (st && !st.fertig) zeigeSchritt(+b.getAttribute("data-s")); }; });
   }
   function offen() {
-    var d = st.daten, w = st.werte, o = { waffen: 0, munition: 0, fragen: 0, sig: 0 };
+    var d = st.daten, w = st.werte, o = { start: 0, waffen: 0, munition: 0, fragen: 0, sig: 0 };
+    WK.FRAGEN_START.forEach(function (f) { if (!w[f[0]]) o.start++; });
+    if (w.zugang === "Nein") { if (!st.sig.kontrolleur) o.sig++; return o; }
     d.items.forEach(function (it, i) { if (!w["pos" + pos(i) + "_vorhanden"]) o.waffen++; });
     var kl = WK.kaliberListe(d);
     kl.kaliber.forEach(function (k, i) { if (!w["mun" + pos(i) + "_vorhanden"]) o.munition++; });
@@ -1170,15 +1212,21 @@
   }
   function navAktualisieren() {
     if (!st) return;
-    var o = offen(), fertig = { 1: true, 2: !o.waffen, 3: !o.munition, 4: !o.fragen, 5: !o.sig, 6: st.fertig };
+    var o = offen(), fertig = { 1: !o.start, 2: !o.waffen, 3: !o.munition, 4: !o.fragen, 5: !o.sig, 6: st.fertig };
     $("nav").querySelectorAll("button").forEach(function (b) {
       var s = +b.getAttribute("data-s");
       b.classList.toggle("aktiv", s === st.schritt);
-      b.classList.toggle("fertig", (!!fertig[s] || st.fertig) && s !== st.schritt);
+      var weg = verweigert() && s >= 2 && s <= 4;
+      b.classList.toggle("fertig", (!!fertig[s] || st.fertig) && s !== st.schritt && !weg);
+      b.disabled = weg; b.style.opacity = weg ? "0.35" : ""; b.style.textDecoration = weg ? "line-through" : "";
     });
   }
-  $("zurueck").onclick = function () { if (st.schritt > 1 && !st.fertig) zeigeSchritt(st.schritt - 1); else startZeigen(); };
-  $("weiter").onclick = function () { if (st.fertig || st.schritt === 6) startZeigen(); else zeigeSchritt(st.schritt + 1); };
+  $("zurueck").onclick = function () {
+    if (st.schritt > 1 && !st.fertig) zeigeSchritt(verweigert() && st.schritt === 5 ? 1 : st.schritt - 1); else startZeigen();
+  };
+  $("weiter").onclick = function () {
+    if (st.fertig || st.schritt === 6) startZeigen(); else zeigeSchritt(verweigert() && st.schritt === 1 ? 5 : st.schritt + 1);
+  };
 
   function startZeigen() {
     if (st) { clearTimeout(speicherTimer); if (!st.fertig) dbPut(st); }
@@ -1232,37 +1280,93 @@
       inputHtml("kontrolle_ort", "Ort der Kontrolle") +
       inputHtml("kontrolleur", "Kontrollierende/r") +
       inputHtml("anwesend", "Anwesende Person(en)") +
-      '</div></div>';
+      '</div></div>' +
+      '<div class="card"><h3>Zugang</h3>' +
+      WK.FRAGEN_START.map(function (f) { return '<div class="zeile"><div class="was">' + esc(f[1]) + '</div>' + jnHtml(f[0]) + '</div>'; }).join("") +
+      '<div id="verweigertBox"></div></div>';
+    verweigertBox();
+  }
+  function verweigert() { return !!st && st.werte.zugang === "Nein"; }
+  function verweigertBox() {
+    var b = $("verweigertBox"); if (!b) return;
+    b.innerHTML = verweigert() ? '<div class="hinweisbox err" style="margin-top:12px"><b>Zugang verweigert:</b> Die Schritte Waffen, Munition und Aufbewahrung entfallen. ' +
+      'Mit „Weiter“ geht es direkt zu den Unterschriften.</div>' : "";
   }
 
   // ---------- Schritt 2
+  var offeneGruppen = {};
+  function snNorm(x) { return String(x || "").toUpperCase().replace(/[\s\-\/\.]/g, ""); }
   function schritt2(el) {
     var d = st.daten, gruppen = [], cur = null;
     d.items.forEach(function (it, i) {
       if (!cur || (it.gruppe || it.nr) !== cur.nr) { cur = { nr: it.gruppe || it.nr, items: [] }; gruppen.push(cur); }
       cur.items.push({ it: it, i: i });
     });
+    function zeile(x) {
+      var it = x.it, n = "pos" + pos(x.i);
+      return '<div class="zeile' + (it.nr ? "" : " teil") + '" data-sn="' + esc(snNorm(it.seriennr) + " " + snNorm(it.nwr)) + '"><div class="was"><b>' + esc(it.art) + '</b>' +
+        '<span class="muted klein">Seriennr. <b style="display:inline;color:var(--text)">' + esc(it.seriennr) + '</b> · ' + esc(it.nwr) + '</span>' +
+        '<input class="bem" data-name="' + n + '_bemerkung" placeholder="Bemerkung (optional)" value="' + esc(st.werte[n + "_bemerkung"] || "") + '"></div>' +
+        jnHtml(n + "_vorhanden") + '</div>';
+    }
     var html = '<div class="gruppe-kopf"><h2 style="margin:4px 0">Waffen und Waffenteile</h2>' +
       '<button class="btn sec klein" type="button" id="alleJa">Alle vorhanden</button></div>' +
+      '<input class="suche" id="snSuche" type="search" inputmode="search" autocomplete="off" placeholder="🔍 Seriennummer suchen …">' +
+      '<div id="snKeine" class="hinweisbox warn versteckt">Keine Waffe / kein Waffenteil mit dieser Seriennummer im Stammdatenblatt.</div>' +
       '<p class="muted klein" style="margin-top:0">Für jede Position antippen, ob sie vorhanden ist. Bemerkung nur bei Bedarf.</p>';
-    gruppen.forEach(function (g) {
-      var h = g.items[0].it;
-      html += '<div class="card"><h3><span class="nr">' + esc(g.nr) + '</span>' + esc(h.hersteller) + ' · ' + esc(h.waffenart) +
+    gruppen.forEach(function (g, gi) {
+      var h = g.items[0].it, haupt = g.items[0].it.nr ? [g.items[0]] : [], teile = g.items.slice(haupt.length);
+      html += '<div class="card" data-gruppe="' + gi + '"><h3><span class="nr">' + esc(g.nr) + '</span>' + esc(h.hersteller) + ' · ' + esc(h.waffenart) +
         '<span class="muted klein"> (Kat. ' + esc(h.kategorie) + ', ' + esc(h.kaliber) + ')</span></h3>';
-      g.items.forEach(function (x) {
-        var it = x.it, n = "pos" + pos(x.i);
-        html += '<div class="zeile' + (it.nr ? "" : " teil") + '"><div class="was"><b>' + esc(it.art) + '</b>' +
-          '<span class="muted klein">Seriennr. <b style="display:inline;color:var(--text)">' + esc(it.seriennr) + '</b> · ' + esc(it.nwr) + '</span>' +
-          '<input class="bem" data-name="' + n + '_bemerkung" placeholder="Bemerkung (optional)" value="' + esc(st.werte[n + "_bemerkung"] || "") + '"></div>' +
-          jnHtml(n + "_vorhanden") + '</div>';
-      });
+      haupt.forEach(function (x) { html += zeile(x); });
+      if (teile.length) {
+        var auf = !!offeneGruppen[gi];
+        html += '<button type="button" class="teile-btn' + (auf ? " auf" : "") + '" data-teile="' + gi + '"><span><span class="pfeil">▸</span> Waffenteile (' + teile.length + ')</span>' +
+          '<span class="teile-stand" data-stand="' + gi + '"></span></button>' +
+          '<div class="teile' + (auf ? "" : " versteckt") + '" data-teilebox="' + gi + '" data-idx="' + teile.map(function (x) { return x.i; }).join(",") + '">' +
+          teile.map(zeile).join("") + '</div>';
+      }
       html += "</div>";
     });
     el.innerHTML = html;
+    teileStand();
+    el.querySelectorAll("[data-teile]").forEach(function (b) {
+      b.onclick = function () {
+        var gi = b.getAttribute("data-teile"), box = el.querySelector('[data-teilebox="' + gi + '"]');
+        offeneGruppen[gi] = box.classList.contains("versteckt");
+        box.classList.toggle("versteckt", !offeneGruppen[gi]); b.classList.toggle("auf", offeneGruppen[gi]);
+      };
+    });
+    $("snSuche").oninput = function () {
+      var q = snNorm(this.value), treffer = 0;
+      el.querySelectorAll(".card[data-gruppe]").forEach(function (card) {
+        var gi = card.getAttribute("data-gruppe"), hat = false;
+        card.querySelectorAll(".zeile[data-sn]").forEach(function (z) {
+          var t = !!q && z.getAttribute("data-sn").indexOf(q) >= 0;
+          z.classList.toggle("treffer", t); if (t) { hat = true; treffer++; }
+        });
+        card.classList.toggle("versteckt", !!q && !hat);
+        var box = card.querySelector("[data-teilebox]"), btn = card.querySelector("[data-teile]");
+        if (box) {
+          var teilTreffer = !!box.querySelector(".treffer"), auf = teilTreffer || (!q && !!offeneGruppen[gi]);
+          box.classList.toggle("versteckt", !auf); btn.classList.toggle("auf", auf);
+        }
+      });
+      $("snKeine").classList.toggle("versteckt", !q || treffer > 0);
+    };
     $("alleJa").onclick = function () {
       d.items.forEach(function (it, i) { if (!st.werte["pos" + pos(i) + "_vorhanden"]) st.werte["pos" + pos(i) + "_vorhanden"] = "Ja"; });
       speichern(); schritt2(el); navAktualisieren();
     };
+  }
+  function teileStand() {
+    document.querySelectorAll("[data-teilebox]").forEach(function (box) {
+      var idx = box.getAttribute("data-idx").split(","), ja = 0, nein = 0;
+      idx.forEach(function (i) { var v = st.werte["pos" + pos(+i) + "_vorhanden"]; if (v === "Ja") ja++; else if (v === "Nein") nein++; });
+      var el = document.querySelector('[data-stand="' + box.getAttribute("data-teilebox") + '"]');
+      el.className = "teile-stand" + (nein ? " nein" : (ja === idx.length ? " ok" : ""));
+      el.textContent = nein ? nein + " nicht vorhanden" : (ja === idx.length ? "✓ alle vorhanden" : (ja + nein) + " von " + idx.length + " erfasst");
+    });
   }
 
   // ---------- Schritt 3
@@ -1367,14 +1471,17 @@
   // ---------- Schritt 6
   function schritt6(el) {
     if (st.fertig) return abschlussFertig(el);
-    var o = offen(), probleme = [];
+    var o = offen(), probleme = [], vw = verweigert();
+    if (o.start) probleme.push(o.start + " Frage(n) zum Zugang offen (Schritt 1)");
     if (o.waffen) probleme.push(o.waffen + " Waffe(n)/Waffenteil(e) ohne Ja/Nein (Schritt 2)");
     if (o.munition) probleme.push(o.munition + " Kaliber ohne Ja/Nein (Schritt 3)");
     if (o.fragen) probleme.push(o.fragen + " Frage(n) zur Aufbewahrung offen (Schritt 4)");
-    if (!st.sig.besitzer) probleme.push("Unterschrift Waffenbesitzer/in fehlt (Schritt 5)");
+    if (!st.sig.besitzer && !vw) probleme.push("Unterschrift Waffenbesitzer/in fehlt (Schritt 5)");
     if (!st.sig.kontrolleur) probleme.push("Unterschrift Kontrollierende/r fehlt (Schritt 5)");
-    var fehlend = st.daten.items.filter(function (it, i) { return st.werte["pos" + pos(i) + "_vorhanden"] === "Nein"; });
+    var fehlend = vw ? [] : st.daten.items.filter(function (it, i) { return st.werte["pos" + pos(i) + "_vorhanden"] === "Nein"; });
     el.innerHTML = '<h2>Abschluss</h2>' +
+      (vw ? '<div class="hinweisbox err"><b>Zugang verweigert.</b> Das Protokoll enthält keine Prüfung der Waffen, Munition und Aufbewahrung.' +
+        (st.sig.besitzer ? "" : " Die Unterschrift der Waffenbesitzerin / des Waffenbesitzers ist in diesem Fall freiwillig.") + '</div>' : "") +
       (probleme.length ? '<div class="hinweisbox warn"><b>Noch offen:</b><ul>' + probleme.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + '</ul></div>'
         : '<div class="hinweisbox ok"><b>Alles ausgefüllt.</b></div>') +
       (fehlend.length ? '<div class="hinweisbox err"><b>Als NICHT vorhanden markiert:</b><ul>' +
@@ -1400,7 +1507,7 @@
         ["besitzer", "kontrolleur"].forEach(function (k) { if (st.sig[k]) sig[k] = unb64(st.sig[k].split(",")[1]); });
         var r = await WK.abschliessen(PDFLib, st.daten, st.original, werte, sig, { anlage: $("anlage").checked });
         st.fertig = true; st.status = "fertig"; st.pdf = r.bytes;
-        st.ergebnis = { name: r.name, hash: r.hash, vermerk: werte.abschluss_vermerk, nichtVorhanden: fehlend.length };
+        st.ergebnis = { name: r.name, hash: r.hash, vermerk: werte.abschluss_vermerk, nichtVorhanden: fehlend.length, verweigert: vw };
         clearTimeout(speicherTimer); await dbPut(st);
         zeigeSchritt(6);
       } catch (e) {
