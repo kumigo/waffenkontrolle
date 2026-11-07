@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Waffenkontrolle">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Waffenkontrolle</title>
 <style>
   :root { --bg:#eef1f5; --card:#fff; --text:#1d2633; --muted:#5d6b7d; --accent:#1f5fa8; --accent-bg:#e8f0fa;
@@ -77,6 +80,18 @@
     line-height:15px; letter-spacing:.5px; white-space:pre; pointer-events:none; user-select:none; overflow:hidden; opacity:.55; }
   .sigwrap canvas { position:relative; display:block; width:100%; aspect-ratio: 4.4 / 1; touch-action:none; cursor:crosshair; }
   .sigwrap .leer { position:absolute; left:12px; bottom:8px; color:#8d9bb0; font-size:13px; pointer-events:none; }
+  .sigvorschau { border:2px dashed #9fb3cc; border-radius:10px; background:#f7f9fc; min-height:110px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; color:var(--accent); font-weight:600; }
+  .sigvorschau img { max-width:100%; max-height:160px; display:block; }
+  .vorschau canvas { width:100%; display:block; margin:0 0 12px; border:1px solid var(--line); border-radius:6px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .sig-ov { position:fixed; inset:0; z-index:70; background:#fff; display:flex; flex-direction:column; }
+  .sig-kopf { display:flex; align-items:center; gap:12px; justify-content:space-between; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--line); }
+  .sig-kopf .route { margin:0; }
+  .sig-flaeche { position:relative; flex:1; overflow:hidden; background:#f7f9fc; touch-action:none; }
+  .sig-flaeche canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+  .sig-flaeche .wz { position:absolute; inset:-80px; transform:rotate(-12deg); color:#b8c4d6; font-size:12px; font-weight:700; line-height:20px; white-space:pre; pointer-events:none; user-select:none; opacity:.45; }
+  .sig-linie { position:absolute; left:6%; right:6%; bottom:22%; border-bottom:2px solid #9fb3cc; pointer-events:none; }
+  .sig-leer { position:absolute; left:6%; bottom:calc(22% + 8px); color:#8d9bb0; font-size:18px; pointer-events:none; }
+  @media (orientation: landscape) { .sig-kopf .hoch { display:none; } }
   .sigaktion { display:flex; justify-content:space-between; align-items:center; margin:6px 0 12px; }
   .hinweisbox { border-radius:10px; padding:12px 14px; margin-bottom:12px; }
   .hinweisbox.warn { background:var(--warn-bg); color:var(--warn); }
@@ -12838,6 +12853,14 @@ var qrcode = function() {
     var page = null, y = 0, seite = 0;
     var S = !!optionen.werte;            // statisch: fertiger Bogen ohne Formularfelder
     var WERTE = optionen.werte || {};
+    var STRICH_FARBE = rgb(0.25, 0.25, 0.3);
+    function streichen(x, yy, w, h) {  // leeres Feld groß durchstreichen (nichts nachtragbar)
+      page.drawLine({ start: { x: x + 2, y: yy + 2 }, end: { x: x + w - 2, y: yy + h - 2 }, thickness: 1, color: STRICH_FARBE });
+      if (h > 30) {  // große Felder: Z-Strich
+        page.drawLine({ start: { x: x + 2, y: yy + h - 2 }, end: { x: x + w - 2, y: yy + h - 2 }, thickness: 1, color: STRICH_FARBE });
+        page.drawLine({ start: { x: x + 2, y: yy + 2 }, end: { x: x + w - 2, y: yy + 2 }, thickness: 1, color: STRICH_FARBE });
+      }
+    }
 
     // Zeichen, die die Standardschrift nicht kann, ersetzen
     function safe(s, font) {
@@ -12897,6 +12920,7 @@ var qrcode = function() {
         var v = WERTE[name] != null ? WERTE[name] : (wert || "");
         size = size || 10;
         page.drawRectangle({ x: x, y: yy, width: w, height: h, borderColor: rgb(0.78, 0.8, 0.84), borderWidth: 0.5 });
+        if (!String(v).trim()) streichen(x, yy, w, h);
         if (v) {
           if (multiline) {
             var fs = size, zeilen = umbrechen(v, F.n, fs, w - 6);
@@ -12919,6 +12943,8 @@ var qrcode = function() {
     function jn(name, xJa, yy, size) {
       size = size || 13;
       if (S) {
+        if (WERTE[name] !== "Ja" && WERTE[name] !== "Nein")
+          page.drawLine({ start: { x: xJa - size / 2 - 4, y: yy + size / 2 }, end: { x: xJa + 30 + size / 2 + 4, y: yy + size / 2 }, thickness: 1.2, color: STRICH_FARBE });
         ["Ja", "Nein"].forEach(function (wert, i) {
           var cx = xJa + i * 30, cy = yy + size / 2, gew = WERTE[name] === wert;
           page.drawCircle({ x: cx, y: cy, size: size / 2, borderColor: gew ? DUNKEL : FELD_RAND, borderWidth: gew ? 1.1 : 0.8 });
@@ -13211,6 +13237,7 @@ var qrcode = function() {
       page.drawRectangle({ x: sx, y: y - sh, width: sb, height: sh, borderColor: FELD_RAND, borderWidth: 0.7, borderDashArray: [3, 2] });
       var sig = S && optionen.unterschriften && optionen.unterschriften[r[1]];
       if (sig) sigs.push({ png: sig, x: sx, y: y - sh, w: sb, h: sh, page: page });
+      else if (S && !optionen.vorschau) streichen(sx, y - sh, sb, sh);
       linie(sx, y - sh - 1, sx + sb, y - sh - 1, 0.8, DUNKEL);
       txt(sx, y - sh - 11, "Ort, Datum, Unterschrift " + r[0], F.n, 7.5, GRAU);
       feld("name_" + r[1], sx, y - sh - 33, sb, 16, false, 10, vor["name_" + r[1]]);
@@ -13407,7 +13434,7 @@ var qrcode = function() {
 (function () {
   "use strict";
   var WK = window.Waffenkontrolle, pdfjs = window.pdfjsLib;
-  var SCHRITTE = ["Start", "Waffen", "Munition", "Aufbewahrung", "Unterschriften", "Abschluss"];
+  var SCHRITTE = ["Start", "Waffen", "Munition", "Aufbewahrung", "Übersicht", "Unterschrift"];
   var liste = [];   // alle Personen der Kontrollliste
   var st = null;    // gerade bearbeitete Person
   var $ = function (id) { return document.getElementById(id); };
@@ -13861,13 +13888,49 @@ var qrcode = function() {
     });
     return c.toDataURL("image/png");
   }
-  async function bildVerkleinern(url) {
-    // Ersatz für ältere Unterschriften ohne Linienzüge: kleines Schwarz-Weiß-PNG
+  async function bildRLE(url) {
+    // ältere Unterschriften ohne Linienzüge: 1-Bit-Bild, lauflängenkodiert (sehr klein)
     var im = new Image(); im.src = url; await new Promise(function (r) { im.onload = r; im.onerror = r; });
-    var w = Math.min(500, im.width || 500), h = Math.round(w * (im.height || 125) / (im.width || 500));
+    var w = 420, h = Math.max(20, Math.round(w * (im.height || 105) / (im.width || 420)));
     var c = document.createElement("canvas"); c.width = w; c.height = h;
-    var g = c.getContext("2d"); g.drawImage(im, 0, 0, w, h);
+    var g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(im, 0, 0, w, h);
+    var px = g.getImageData(0, 0, w, h).data, runs = [], farbe = 0, lauf = 0;
+    for (var i = 0; i < w * h; i++) {
+      var dunkel = px[i * 4 + 3] > 70 ? 1 : 0;
+      if (dunkel === farbe) lauf++; else { runs.push(lauf); farbe = dunkel; lauf = 1; }
+    }
+    runs.push(lauf);
+    return { w: w, h: h, r: runs };
+  }
+  function rleBild(b) {
+    var c = document.createElement("canvas"); c.width = b.w; c.height = b.h;
+    var g = c.getContext("2d"), d = g.createImageData(b.w, b.h), i = 0, farbe = 0;
+    b.r.forEach(function (n) {
+      for (var k = 0; k < n; k++, i++) if (farbe) { d.data[i * 4] = 11; d.data[i * 4 + 1] = 31; d.data[i * 4 + 2] = 77; d.data[i * 4 + 3] = 255; }
+      farbe = 1 - farbe;
+    });
+    g.putImageData(d, 0, 0);
     return c.toDataURL("image/png");
+  }
+  // Linienzüge vereinfachen (Douglas-Peucker), damit weniger QR-Codes nötig sind
+  function vereinfachen(v) {
+    function rdp(pk, eps) {
+      if (pk.length < 3) return pk;
+      var a = pk[0], b = pk[pk.length - 1], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, max = 0, idx = 0;
+      for (var i = 1; i < pk.length - 1; i++) {
+        var d = Math.abs(dy * pk[i][0] - dx * pk[i][1] + b[0] * a[1] - b[1] * a[0]) / len;
+        if (d > max) { max = d; idx = i; }
+      }
+      if (max <= eps) return [a, b];
+      return rdp(pk.slice(0, idx + 1), eps).slice(0, -1).concat(rdp(pk.slice(idx), eps));
+    }
+    return { w: v.w, h: v.h, s: v.s.map(function (z) {
+      var x = z[0], y = z[1], pk = [[x, y, z[5] || 22]];
+      for (var i = 3; i + 2 < z.length; i += 3) { x += z[i]; y += z[i + 1]; pk.push([x, y, z[i + 2]]); }
+      var r = rdp(pk, 1.6), out = [r[0][0], r[0][1], 0];
+      for (var j = 1; j < r.length; j++) out.push(r[j][0] - r[j - 1][0], r[j][1] - r[j - 1][1], r[j][2]);
+      return out;
+    }) };
   }
   // Zurück: Ergebnisse vom iPad zum PC
   $("ergebnisZeigen").onclick = async function () {
@@ -13875,16 +13938,16 @@ var qrcode = function() {
     if (!fertig.length) { hinweis("Noch keine abgeschlossenen Kontrollen."); return; }
     var personen = [];
     for (var i = 0; i < fertig.length; i++) {
-      var p = fertig[i], e = { id: p.id, daten: p.daten, werte: Object.assign({}, p.werte, { abschluss_vermerk: p.ergebnis.vermerk }), vec: {}, png: {} };
+      var p = fertig[i], e = { id: p.id, n: p.daten.person[0] || "", werte: Object.assign({}, p.werte, { abschluss_vermerk: p.ergebnis.vermerk }), vec: {}, rle: {} };
       for (var k of ["besitzer", "kontrolleur"]) {
-        if (p.sigVec && p.sigVec[k] && p.sigVec[k].ok !== false && p.sigVec[k].s.length && p.sig[k]) e.vec[k] = { w: p.sigVec[k].w, h: p.sigVec[k].h, s: p.sigVec[k].s };
-        else if (p.sig && p.sig[k]) e.png[k] = await bildVerkleinern(p.sig[k]);
+        if (p.sigVec && p.sigVec[k] && p.sigVec[k].ok !== false && p.sigVec[k].s.length && p.sig[k]) e.vec[k] = vereinfachen(p.sigVec[k]);
+        else if (p.sig && p.sig[k]) e.rle[k] = await bildRLE(p.sig[k]);
       }
       personen.push(e);
     }
     var n = await qrAnzeigen("WKR1", { typ: "ergebnis", erstellt: new Date().toISOString(), personen: personen },
       fertig.length + " abgeschlossene Kontrolle(n) – am PC „Ergebnisse vom iPad empfangen“ klicken und die Webcam hierauf richten",
-      "Die Codes wechseln automatisch. Am PC entsteht daraus das fertige PDF mit Unterschriften und Stammdatenblatt.", 600);
+      "Die Codes wechseln automatisch. Am PC entsteht daraus das fertige PDF mit Unterschriften und Stammdatenblatt.", 800);
   };
   $("ergebnisScan").onclick = function () {
     qrScannen("WKR1", "iPad mit den QR-Codes vor die Webcam halten", ergebnisImport);
@@ -13892,22 +13955,19 @@ var qrcode = function() {
   async function ergebnisImport(obj) {
     var m = $("startMeldung"), ok = [], fehler = [];
     for (var i = 0; i < obj.personen.length; i++) {
-      var e = obj.personen[i], name = (e.daten.person && e.daten.person[0]) || e.id;
+      var e = obj.personen[i], name = e.n || e.id;
       try {
         meldung(m, "ok", "Erzeuge PDF " + (i + 1) + " von " + obj.personen.length + ": " + esc(name) + " …");
         var p = liste.filter(function (x) { return x.id === e.id; })[0];
-        if (!p) {
-          p = { id: e.id, daten: e.daten, original: null, werte: {}, sig: {}, schritt: 6, status: "offen", fertig: false, reihenfolge: Date.now() + i };
-          liste.push(p);
-        }
+        if (!p) throw new Error("nicht in der Kontrollliste dieses PCs – bitte das Stammdatenblatt erst laden und dann nochmal scannen");
         var sigUrl = {}, sigBytes = {};
         ["besitzer", "kontrolleur"].forEach(function (k) {
-          if (e.vec && e.vec[k]) sigUrl[k] = sigVecBild(e.vec[k]); else if (e.png && e.png[k]) sigUrl[k] = e.png[k];
+          if (e.vec && e.vec[k]) sigUrl[k] = sigVecBild(e.vec[k]); else if (e.rle && e.rle[k]) sigUrl[k] = rleBild(e.rle[k]);
           if (sigUrl[k]) sigBytes[k] = unb64(sigUrl[k].split(",")[1]);
         });
         var vw = e.werte.zugang === "Nein";
-        var fehlend = vw ? 0 : e.daten.items.filter(function (it, j) { return e.werte["pos" + pos(j) + "_vorhanden"] === "Nein"; }).length;
-        var r = await WK.abschliessen(PDFLib, e.daten, p.original, e.werte, sigBytes, { anlage: !!p.original, logo: logoBytes() });
+        var fehlend = vw ? 0 : p.daten.items.filter(function (it, j) { return e.werte["pos" + pos(j) + "_vorhanden"] === "Nein"; }).length;
+        var r = await WK.abschliessen(PDFLib, p.daten, p.original, e.werte, sigBytes, { anlage: !!p.original, logo: logoBytes() });
         p.werte = e.werte; p.sig = sigUrl; p.fertig = true; p.status = "fertig"; p.pdf = r.bytes; p.schritt = 6;
         p.ergebnis = { name: r.name, hash: r.hash, vermerk: e.werte.abschluss_vermerk, nichtVorhanden: fehlend, verweigert: vw, vomIpad: true };
         await dbPut(p); ok.push(name);
@@ -13978,7 +14038,7 @@ var qrcode = function() {
   }
   function navAktualisieren() {
     if (!st) return;
-    var o = offen(), fertig = { 1: !o.start, 2: !o.waffen, 3: !o.munition, 4: !o.fragen, 5: !o.sig, 6: st.fertig };
+    var o = offen(), fertig = { 1: !o.start, 2: !o.waffen, 3: !o.munition, 4: !o.fragen, 5: !!st.gezeigt, 6: st.fertig };
     $("nav").querySelectorAll("button").forEach(function (b) {
       var s = +b.getAttribute("data-s");
       b.classList.toggle("aktiv", s === st.schritt);
@@ -14179,113 +14239,84 @@ var qrcode = function() {
     alleWachsen();
   }
 
-  // ---------- Schritt 5
-  function schritt5(el) {
-    if (!st.werte.name_kontrolleur && st.werte.kontrolleur) { st.werte.name_kontrolleur = st.werte.kontrolleur; speichern(); }
-    var wz = ((st.daten.behoerde || "") + "  ·  DOK-NR. " + (st.daten.dok_nr || "") + "  ·  ").toUpperCase();
-    var wzBlock = new Array(40).join(new Array(8).join(wz) + "\n");
-    el.innerHTML = '<h2>Unterschriften</h2>' +
-      '<p>Die Kontrolle wurde in meinem Beisein durchgeführt. Die Angaben sind zutreffend.</p>' +
-      [["besitzer", "Waffenbesitzer/in"], ["kontrolleur", "Kontrollierende/r · Sachbearbeiter Waffen & Sprengstoff"]].map(function (r) {
-        return '<div class="card"><h3>Unterschrift ' + r[1] + '</h3>' +
-          '<div class="sigwrap"><div class="wz">' + esc(wzBlock) + '</div><canvas id="sig_' + r[0] + '"></canvas>' +
-          '<div class="leer" id="leer_' + r[0] + '">Hier mit Finger oder Stift unterschreiben</div></div>' +
-          '<div class="sigaktion"><span class="muted klein" id="stat_' + r[0] + '"></span>' +
-          '<button class="btn sec klein" type="button" id="del_' + r[0] + '">Löschen</button></div>' +
-          inputHtml("name_" + r[0], "Name in Druckbuchstaben") + '</div>';
-      }).join("");
-    ["besitzer", "kontrolleur"].forEach(sigPad);
+  // ---------- Schritt 5: Übersicht (Vorschau des Protokolls, leere Felder durchgestrichen) – dem Bürger zeigen
+  function probleme(ohneSig) {
+    var o = offen(), p = [], vw = verweigert();
+    if (o.start) p.push(o.start + " Angabe(n) zur Kontrolle offen (Schritt 1)");
+    if (o.waffen) p.push(o.waffen + " Waffe(n)/Waffenteil(e) ohne Ja/Nein (Schritt 2)");
+    if (o.munition) p.push(o.munition + " Kaliber ohne Ja/Nein (Schritt 3)");
+    if (o.fragen) p.push(o.fragen + " Frage(n) zur Aufbewahrung offen (Schritt 4)");
+    if (!ohneSig) {
+      if (!st.sig.besitzer && !vw) p.push("Unterschrift Waffenbesitzer/in fehlt");
+      if (!st.sig.kontrolleur) p.push("Unterschrift Kontrollierende/r fehlt");
+    }
+    return p;
   }
-
-  function sigPad(wer) {
-    var cv = $("sig_" + wer), ctx = cv.getContext("2d"), leer = $("leer_" + wer), stat = $("stat_" + wer);
-    var ratio = Math.max(window.devicePixelRatio || 1, 2), malt = false, last = null, vecZug = null, vecX = 0, vecY = 0;
-    function groesse() {
-      var r = cv.getBoundingClientRect();
-      cv.width = Math.round(r.width * ratio); cv.height = Math.round(r.height * ratio);
-      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#0b1f4d";
-      if (st.sig[wer]) {
-        var img = new Image();
-        img.onload = function () { ctx.drawImage(img, 0, 0, r.width, r.height); };
-        img.src = st.sig[wer];
-      }
-      anzeigen();
-    }
-    function anzeigen() {
-      leer.style.display = st.sig[wer] ? "none" : "";
-      stat.textContent = st.sig[wer] ? "✓ unterschrieben" : "";
-    }
-    function punkt(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, p: e.pressure || 0.5 }; }
-    cv.addEventListener("pointerdown", function (e) {
-      e.preventDefault(); malt = true; cv.setPointerCapture(e.pointerId); last = punkt(e);
-      ctx.beginPath(); ctx.arc(last.x, last.y, 1, 0, Math.PI * 2); ctx.fillStyle = "#0b1f4d"; ctx.fill();
-      leer.style.display = "none";
-      var rr = cv.getBoundingClientRect();
-      if (!st.sigVec) st.sigVec = {};
-      var v = st.sigVec[wer];
-      if (!v || (!st.sig[wer] && v.s.length) || Math.abs(v.w - rr.width) > 1 || Math.abs(v.h - rr.height) > 1) {
-        // neue Vektor-Aufzeichnung; vorhandene Bild-Unterschrift ohne Vektoren -> Vektoren ungültig
-        v = st.sigVec[wer] = { w: Math.round(rr.width), h: Math.round(rr.height), s: [], ok: !st.sig[wer] };
-      }
-      vecZug = [Math.round(last.x * 2), Math.round(last.y * 2), 0]; vecX = vecZug[0]; vecY = vecZug[1]; v.s.push(vecZug);
-    });
-    cv.addEventListener("pointermove", function (e) {
-      if (!malt) return;
-      e.preventDefault();
-      var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
-      if (!evs.length) evs = [e];
-      evs.forEach(function (ev) {
-        var p = punkt(ev);
-        ctx.lineWidth = e.pointerType === "pen" ? 1.2 + p.p * 2.2 : 2.2;
-        ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-        last = p;
-        if (vecZug) {
-          var qx = Math.round(p.x * 2), qy = Math.round(p.y * 2);
-          if (Math.abs(qx - vecX) + Math.abs(qy - vecY) >= 2) { vecZug.push(qx - vecX, qy - vecY, Math.round(ctx.lineWidth * 10)); vecX = qx; vecY = qy; }
-        }
-      });
-    });
-    function ende() {
-      if (!malt) return;
-      malt = false; vecZug = null;
-      st.sig[wer] = cv.toDataURL("image/png");
-      speichern(); anzeigen(); navAktualisieren();
-    }
-    cv.addEventListener("pointerup", ende);
-    cv.addEventListener("pointercancel", ende);
-    $("del_" + wer).onclick = function () {
-      ctx.clearRect(0, 0, cv.width, cv.height); delete st.sig[wer]; if (st.sigVec) delete st.sigVec[wer]; speichern(); anzeigen(); navAktualisieren();
-    };
-    groesse();
+  function fehlendeTeile() {
+    return verweigert() ? [] : st.daten.items.filter(function (it, i) { return st.werte["pos" + pos(i) + "_vorhanden"] === "Nein"; });
   }
-
-  // ---------- Schritt 6
-  function schritt6(el) {
-    if (st.fertig) return abschlussFertig(el);
-    var o = offen(), probleme = [], vw = verweigert();
-    if (o.start) probleme.push(o.start + " Angabe(n) zur Kontrolle offen (Schritt 1)");
-    if (o.waffen) probleme.push(o.waffen + " Waffe(n)/Waffenteil(e) ohne Ja/Nein (Schritt 2)");
-    if (o.munition) probleme.push(o.munition + " Kaliber ohne Ja/Nein (Schritt 3)");
-    if (o.fragen) probleme.push(o.fragen + " Frage(n) zur Aufbewahrung offen (Schritt 4)");
-    if (!st.sig.besitzer && !vw) probleme.push("Unterschrift Waffenbesitzer/in fehlt (Schritt 5)");
-    if (!st.sig.kontrolleur) probleme.push("Unterschrift Kontrollierende/r fehlt (Schritt 5)");
-    var fehlend = vw ? [] : st.daten.items.filter(function (it, i) { return st.werte["pos" + pos(i) + "_vorhanden"] === "Nein"; });
-    el.innerHTML = '<h2>Abschluss</h2>' +
-      (vw ? '<div class="hinweisbox err"><b>Kontrolle verweigert.</b> Das Protokoll enthält keine Prüfung der Waffen, Munition und Aufbewahrung.' +
-        (st.sig.besitzer ? "" : " Die Unterschrift der Waffenbesitzerin / des Waffenbesitzers ist in diesem Fall freiwillig.") + '</div>' : "") +
-      (probleme.length ? '<div class="hinweisbox warn"><b>Noch offen:</b><ul>' + probleme.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + '</ul></div>'
+  function inhaltStand() {
+    var w = Object.assign({}, st.werte); delete w.name_besitzer; delete w.name_kontrolleur; delete w.kontrolle_bis;
+    return JSON.stringify(Object.keys(w).sort().map(function (k) { return [k, w[k]]; }));
+  }
+  async function schritt5(el) {
+    var pr = probleme(true), fehlend = fehlendeTeile(), vw = verweigert();
+    el.innerHTML = '<h2>Übersicht</h2>' +
+      '<p>Bitte der Waffenbesitzerin / dem Waffenbesitzer zeigen. <b>Leere Felder sind durchgestrichen</b> und können nach der Unterschrift nicht mehr ergänzt werden.</p>' +
+      (vw ? '<div class="hinweisbox err"><b>Kontrolle verweigert.</b> Waffen, Munition und Aufbewahrung wurden nicht geprüft.</div>' : "") +
+      (pr.length ? '<div class="hinweisbox warn"><b>Noch offen (wird durchgestrichen):</b><ul>' + pr.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + '</ul></div>'
         : '<div class="hinweisbox ok"><b>Alles ausgefüllt.</b></div>') +
       (fehlend.length ? '<div class="hinweisbox err"><b>Als NICHT vorhanden markiert:</b><ul>' +
         fehlend.map(function (it) { return "<li>" + esc(it.art + " " + it.hersteller + ", Seriennr. " + it.seriennr) + "</li>"; }).join("") + '</ul></div>' : "") +
-      '<div class="card"><p>Mit „Abschließen“ wird das fertige Protokoll als PDF erzeugt. Danach kann nichts mehr geändert werden. ' +
-      'Das PDF enthält keine ausfüllbaren Felder, die Unterschriften sind fest eingebettet.</p>' +
-      '<label class="f" style="display:flex;gap:8px;align-items:center;color:var(--text);margin-bottom:14px"><input type="checkbox" id="anlage"' + (st.original ? " checked" : " disabled") + ' style="width:auto;margin:0"> Stammdatenblatt als Anlage anhängen' +
-      (st.original ? "" : " <span class=\"muted klein\">(per QR-Code übertragen – Original nicht vorhanden)</span>") + '</label>' +
-      '<button class="btn rot" type="button" id="abschliessen">Abschließen und PDF erstellen</button>' +
+      '<div id="vorschau" class="vorschau"><p class="muted">Vorschau wird erstellt …</p></div>' +
+      '<button class="btn gruen" type="button" id="zurUnterschrift" style="width:100%;margin-top:12px">Alles korrekt – weiter zur Unterschrift ›</button>';
+    $("zurUnterschrift").onclick = function () { zeigeSchritt(6); };
+    var n = st.id;
+    try {
+      var werte = Object.assign({}, st.werte, { kontrolle_bis: st.werte.kontrolle_bis || jetztZeit(), abschluss_vermerk: "VORSCHAU – noch nicht unterschrieben" });
+      var r = await WK.abschliessen(PDFLib, st.daten, null, werte, {}, { anlage: false, vorschau: true, logo: logoBytes() });
+      if (!st || st.id !== n || st.schritt !== 5) return;
+      var doc = await pdfjs.getDocument({ data: r.bytes, isEvalSupported: false }).promise, box = $("vorschau");
+      box.innerHTML = "";
+      for (var i = 1; i <= doc.numPages; i++) {
+        var pg = await doc.getPage(i), vp = pg.getViewport({ scale: 2 });
+        var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+        await pg.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+        if (!st || st.id !== n || st.schritt !== 5) return;
+        box.appendChild(c);
+      }
+    } catch (e) { console.error(e); $("vorschau").innerHTML = '<p class="hinweisbox err">Vorschau konnte nicht erstellt werden: ' + esc(e.message || e) + '</p>'; }
+  }
+
+  // ---------- Schritt 6: Unterschriften (Vollbild) und Abschluss
+  function schritt6(el) {
+    if (st.fertig) return abschlussFertig(el);
+    if (!st.werte.name_kontrolleur && st.werte.kontrolleur) { st.werte.name_kontrolleur = st.werte.kontrolleur; speichern(); }
+    if (!st.gezeigt) { st.gezeigt = inhaltStand(); speichern(); }
+    var vw = verweigert();
+    el.innerHTML = '<h2>Unterschriften</h2>' +
+      '<p>' + (vw ? "Die obigen Angaben sind zutreffend." : "Die Kontrolle wurde in meinem Beisein durchgeführt. Die Angaben sind zutreffend.") + '</p>' +
+      [["besitzer", "Waffenbesitzer/in" + (vw ? " (freiwillig)" : "")], ["kontrolleur", "Kontrollierende/r · Sachbearbeiter Waffen & Sprengstoff"]].map(function (r) {
+        return '<div class="card"><h3>Unterschrift ' + esc(r[1]) + '</h3>' +
+          '<div class="sigvorschau" data-sign="' + r[0] + '">' + (st.sig[r[0]] ? '<img src="' + st.sig[r[0]] + '" alt="Unterschrift">' : '<span>✍️ Zum Unterschreiben antippen</span>') + '</div>' +
+          '<div class="sigaktion"><span class="muted klein">' + (st.sig[r[0]] ? "✓ unterschrieben" : "") + '</span>' +
+          (st.sig[r[0]] ? '<button class="btn sec klein" type="button" data-sigweg="' + r[0] + '">Löschen</button>' : "") + '</div>' +
+          inputHtml("name_" + r[0], "Name in Druckbuchstaben") + '</div>';
+      }).join("") +
+      '<div class="card"><label class="f" style="display:flex;gap:8px;align-items:center;color:var(--text);margin-bottom:14px"><input type="checkbox" id="anlage"' + (st.original ? " checked" : " disabled") + ' style="width:auto;margin:0"> Stammdatenblatt als Anlage anhängen' +
+      (st.original ? "" : " <span class=\"muted klein\">(Original nicht auf diesem Gerät – wird beim Zurückübertragen am PC angehängt)</span>") + '</label>' +
+      '<button class="btn rot" type="button" id="abschliessen" style="width:100%">Abschließen und PDF erstellen</button>' +
       '<div id="abschlussMeldung"></div></div>';
+    el.querySelectorAll("[data-sign]").forEach(function (b) { b.onclick = function () { unterschriftVollbild(b.getAttribute("data-sign"), function () { schritt6(el); navAktualisieren(); }); }; });
+    el.querySelectorAll("[data-sigweg]").forEach(function (b) { b.onclick = function () {
+      var k = b.getAttribute("data-sigweg"); delete st.sig[k]; if (st.sigVec) delete st.sigVec[k]; speichern(); schritt6(el); navAktualisieren(); }; });
+    alleWachsen();
     $("abschliessen").onclick = async function () {
-      var txt = probleme.length ? "Es ist noch nicht alles ausgefüllt. Trotzdem abschließen?" : "Kontrolle jetzt abschließen? Danach sind keine Änderungen mehr möglich.";
+      if (st.gezeigt && st.gezeigt !== inhaltStand()) {
+        if (!(await frage("Seit der Übersicht wurden Angaben geändert. Bitte die Übersicht erneut zeigen. Trotzdem abschließen?", "Trotzdem abschließen", true))) { st.gezeigt = null; zeigeSchritt(5); return; }
+      }
+      var pr = probleme(false), fehlend = fehlendeTeile();
+      var txt = pr.length ? "Noch offen: " + pr.join("; ") + ". Leere Felder werden durchgestrichen. Trotzdem abschließen?" : "Kontrolle jetzt abschließen? Danach sind keine Änderungen mehr möglich.";
       var btn = this;
       if (!(await frage(txt, "Abschließen", true))) return;
       btn.disabled = true;
@@ -14300,7 +14331,7 @@ var qrcode = function() {
         ["besitzer", "kontrolleur"].forEach(function (k) { if (st.sig[k]) sig[k] = unb64(st.sig[k].split(",")[1]); });
         var r = await WK.abschliessen(PDFLib, st.daten, st.original, werte, sig, { anlage: $("anlage").checked, logo: logoBytes() });
         st.fertig = true; st.status = "fertig"; st.pdf = r.bytes;
-        st.ergebnis = { name: r.name, hash: r.hash, vermerk: werte.abschluss_vermerk, nichtVorhanden: fehlend.length, verweigert: vw };
+        st.ergebnis = { name: r.name, hash: r.hash, vermerk: werte.abschluss_vermerk, nichtVorhanden: fehlend.length, verweigert: verweigert() };
         clearTimeout(speicherTimer); await dbPut(st);
         zeigeSchritt(6);
       } catch (e) {
@@ -14309,6 +14340,90 @@ var qrcode = function() {
       }
     };
   }
+
+  // Vollbild-Unterschrift: ganze Seite zum Unterschreiben (iPad quer), Ergebnis wird auf die Schrift zugeschnitten
+  function unterschriftVollbild(wer, fertigFn) {
+    var titel = wer === "besitzer" ? "Unterschrift Waffenbesitzer/in" : "Unterschrift Kontrollierende/r";
+    var wz = ((st.daten.behoerde || "") + "  ·  DOK-NR. " + (st.daten.dok_nr || "") + "  ·  ").toUpperCase();
+    var ov = document.createElement("div"); ov.className = "sig-ov";
+    ov.innerHTML = '<div class="sig-kopf"><b>' + esc(titel) + '</b><span class="hoch muted">Tipp: iPad quer drehen</span>' +
+      '<span class="route"><button class="btn sec" type="button" data-s="neu">Löschen</button><button class="btn sec" type="button" data-s="ab">Abbrechen</button>' +
+      '<button class="btn gruen" type="button" data-s="ok">Fertig</button></span></div>' +
+      '<div class="sig-flaeche"><div class="wz">' + esc(new Array(60).join(new Array(10).join(wz) + "\n")) + '</div><canvas></canvas>' +
+      '<div class="sig-linie"></div><div class="sig-leer">Hier unterschreiben</div></div>';
+    document.body.appendChild(ov);
+    document.documentElement.style.overflow = "hidden";
+    var cv = ov.querySelector("canvas"), ctx = cv.getContext("2d"), leer = ov.querySelector(".sig-leer");
+    var ratio = Math.max(window.devicePixelRatio || 1, 2), malt = false, last = null, zuege = [], zug = null, zx = 0, zy = 0;
+    function groesse() {
+      var r = cv.getBoundingClientRect();
+      cv.width = Math.round(r.width * ratio); cv.height = Math.round(r.height * ratio);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#0b1f4d"; ctx.fillStyle = "#0b1f4d";
+      zeichneAlles();
+    }
+    function zeichneAlles() {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      zuege.forEach(function (z) {
+        var x = z[0] / 2, y = z[1] / 2; ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
+        for (var i = 3; i + 2 < z.length; i += 3) { var nx = x + z[i] / 2, ny = y + z[i + 1] / 2; ctx.lineWidth = z[i + 2] / 10; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke(); x = nx; y = ny; }
+      });
+      leer.style.display = zuege.length ? "none" : "";
+    }
+    var skaliert = false;
+    window.addEventListener("resize", onResize);
+    function onResize() { if (zuege.length) skaliert = true; groesse(); }
+    function punkt(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, p: e.pressure || 0.5 }; }
+    cv.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); malt = true; cv.setPointerCapture(e.pointerId); last = punkt(e);
+      ctx.beginPath(); ctx.arc(last.x, last.y, 1, 0, Math.PI * 2); ctx.fill();
+      leer.style.display = "none";
+      zug = [Math.round(last.x * 2), Math.round(last.y * 2), 0]; zx = zug[0]; zy = zug[1]; zuege.push(zug);
+    });
+    cv.addEventListener("pointermove", function (e) {
+      if (!malt) return;
+      e.preventDefault();
+      var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      if (!evs.length) evs = [e];
+      evs.forEach(function (ev) {
+        var p = punkt(ev);
+        ctx.lineWidth = e.pointerType === "pen" ? 1.6 + p.p * 2.6 : 3;
+        ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+        last = p;
+        var qx = Math.round(p.x * 2), qy = Math.round(p.y * 2);
+        if (Math.abs(qx - zx) + Math.abs(qy - zy) >= 3) { zug.push(qx - zx, qy - zy, Math.round(ctx.lineWidth * 10)); zx = qx; zy = qy; }
+      });
+    });
+    function hoch() { malt = false; }
+    cv.addEventListener("pointerup", hoch); cv.addEventListener("pointercancel", hoch);
+    function zu() { window.removeEventListener("resize", onResize); document.documentElement.style.overflow = ""; ov.remove(); }
+    ov.addEventListener("click", function (e) {
+      var s = e.target.getAttribute && e.target.getAttribute("data-s");
+      if (s === "neu") { zuege = []; zeichneAlles(); }
+      if (s === "ab") zu();
+      if (s === "ok") {
+        if (!zuege.length) { zu(); return; }
+        // Begrenzungsrahmen der Schrift (in halben Pixeln) + Rand
+        var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+        zuege.forEach(function (z) {
+          var x = z[0], y = z[1]; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+          for (var i = 3; i + 2 < z.length; i += 3) { x += z[i]; y += z[i + 1]; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+        });
+        var rand = 16; minX -= rand; minY -= rand; maxX += rand; maxY += rand;
+        var bw = maxX - minX, bh = maxY - minY;
+        // Seitenverhältnis des PDF-Feldes (ca. 4:1) – breiter auffüllen statt verzerren
+        var ziel = 4.1;
+        if (bw / bh < ziel) { var nb = bh * ziel; minX -= (nb - bw) / 2; bw = nb; } else { var nh = bw / ziel; minY -= (nh - bh) / 2; bh = nh; }
+        var verschoben = zuege.map(function (z) { var c = z.slice(); c[0] = Math.round(z[0] - minX); c[1] = Math.round(z[1] - minY); return c; });
+        var v = { w: Math.round(bw / 2), h: Math.round(bh / 2), s: verschoben, ok: true };
+        if (!st.sigVec) st.sigVec = {};
+        st.sigVec[wer] = v; st.sig[wer] = sigVecBild(v);
+        speichern(); zu(); fertigFn();
+      }
+    });
+    requestAnimationFrame(groesse);
+  }
+
   function abschlussFertig(el) {
     var r = st.ergebnis, p = st;
     el.innerHTML = '<h2>Abgeschlossen</h2><div class="hinweisbox ok"><b>✓ ' + esc(r.vermerk) + '</b><br>' + esc(r.name) +
