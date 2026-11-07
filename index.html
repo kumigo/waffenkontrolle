@@ -1348,8 +1348,9 @@
         card.classList.toggle("versteckt", !!q && !hat);
         var box = card.querySelector("[data-teilebox]"), btn = card.querySelector("[data-teile]");
         if (box) {
-          var teilTreffer = !!box.querySelector(".treffer"), auf = teilTreffer || (!q && !!offeneGruppen[gi]);
+          var auf = !!offeneGruppen[gi];
           box.classList.toggle("versteckt", !auf); btn.classList.toggle("auf", auf);
+          btn.classList.toggle("treffer", !!box.querySelector(".treffer"));
         }
       });
       $("snKeine").classList.toggle("versteckt", !q || treffer > 0);
