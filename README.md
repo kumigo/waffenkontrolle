@@ -10,4 +10,4 @@ Browser-App für Aufbewahrungskontrollen nach § 36 WaffG.
 Unterschriften und PDFs werden ausschließlich im Browser des Geräts verarbeitet und
 gespeichert. Es werden keine Daten an einen Server gesendet.
 
-Verwendete Bibliotheken (eingebettet): pdf.js 3.11.174 (Apache-2.0), pdf-lib 1.17.1 (MIT).
+Verwendete Bibliotheken (eingebettet): pdf.js 3.11.174 (Apache-2.0), pdf-lib 1.17.1 (MIT), jsQR 1.4.0 (Apache-2.0), qrcode-generator 1.4.4 (MIT).
