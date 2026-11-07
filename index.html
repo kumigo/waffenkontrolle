@@ -13483,7 +13483,22 @@ var qrcode = function() {
       grp.querySelectorAll("button").forEach(function (x) { x.classList.toggle("an", x.getAttribute("data-v") === st.werte[name]); });
       speichern(); navAktualisieren();
       if (name === "zugang") verweigertBox();
-      if (st.schritt === 2) teileStand();
+      if (st.schritt === 2) {
+        // Hauptwaffe "Ja" -> alle noch offenen Waffenteile dieser Waffe ebenfalls "Ja"
+        var card = grp.closest(".card"), box = card && card.querySelector("[data-teilebox]");
+        if (box && st.werte[name] === "Ja" && !grp.closest("[data-teilebox]")) {
+          box.getAttribute("data-idx").split(",").forEach(function (i) {
+            var tn = "pos" + pos(+i) + "_vorhanden";
+            if (!st.werte[tn]) {
+              st.werte[tn] = "Ja";
+              var tg = box.querySelector('.jn[data-name="' + tn + '"]');
+              if (tg) tg.querySelectorAll("button").forEach(function (x) { x.classList.toggle("an", x.getAttribute("data-v") === "Ja"); });
+            }
+          });
+          speichern(); navAktualisieren();
+        }
+        teileStand();
+      }
     }
   });
   document.addEventListener("input", function (e) {
