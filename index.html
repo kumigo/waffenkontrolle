@@ -12859,6 +12859,18 @@ var qrcode = function() {
       });
       return out;
     }
+    // Bemerkungsfeld: im fertigen PDF wächst das Kästchen mit dem Text (ggf. auf neuer Seite)
+    function bemerkungsFeld(label) {
+      var h = 62;
+      if (S) {
+        var z = umbrechen(WERTE.bemerkungen || "", F.n, 9, W - 2 * RAND - 6);
+        h = Math.min(Math.max(62, z.length * 9 * 1.15 + 8), H - 60 * mm);
+      }
+      if (y - 10 - h < 20 * mm) { neueSeite(); y -= 4; }
+      txt(RAND, y - 8, label, F.n, 7, GRAU);
+      feld("bemerkungen", RAND, y - 10 - h, W - 2 * RAND, h, true, 9);
+      y -= 36 + h;
+    }
     function feld(name, x, yy, w, h, multiline, size, wert) {
       if (S) {
         var v = WERTE[name] != null ? WERTE[name] : (wert || "");
@@ -13140,14 +13152,10 @@ var qrcode = function() {
       x += bb * r[2];
     });
     y -= 36;
-    txt(RAND, y - 8, "Bemerkungen / festgestellte Mängel / Auflagen", F.n, 7, GRAU);
-    feld("bemerkungen", RAND, y - 10 - 62, bb, 62, true, 9);
-    y -= 98;
+    bemerkungsFeld("Bemerkungen / festgestellte Mängel / Auflagen");
     } else {
       y -= 6;
-      txt(RAND, y - 8, "Bemerkungen", F.n, 7, GRAU);
-      feld("bemerkungen", RAND, y - 10 - 62, bb, 62, true, 9);
-      y -= 98;
+      bemerkungsFeld("Bemerkungen");
     }
 
     // ---- Unterschriften
@@ -13504,7 +13512,11 @@ var qrcode = function() {
   document.addEventListener("input", function (e) {
     var n = e.target.getAttribute && e.target.getAttribute("data-name");
     if (n && st && !st.fertig) { st.werte[n] = e.target.value; speichern(); }
+    if (e.target.tagName === "TEXTAREA") wachsen(e.target);
   });
+
+  function wachsen(t) { t.style.height = "auto"; t.style.height = Math.max(t.scrollHeight + 2, 90) + "px"; }
+  function alleWachsen() { document.querySelectorAll("textarea").forEach(wachsen); }
 
   // ---------- Übersicht
   var meinName = $("meinName");
@@ -13887,8 +13899,10 @@ var qrcode = function() {
     b.innerHTML = '<div style="padding:4px 0 12px"><div class="muted klein" style="margin-bottom:8px">wegen</div><div class="chips">' +
       WK.GRUENDE.map(function (g) { return '<button type="button" class="chip' + (st.werte[g[0]] === "X" ? " an" : "") + '" data-chip="' + g[0] + '">' + esc(g[1]) + '</button>'; }).join("") +
       '</div><div style="margin-top:10px">' + inputHtml("grund_sonstig", "sonstiger Grund (bitte benennen)") + '</div>' +
+      '<div style="margin-top:10px">' + inputHtml("bemerkungen", "Bemerkungen", { textarea: true }) + '</div>' +
       '<div class="hinweisbox err" style="margin:12px 0 0"><b>Kontrolle verweigert:</b> Die Schritte Waffen, Munition und Aufbewahrung entfallen. ' +
       'Mit „Weiter“ geht es direkt zu den Unterschriften.</div></div>';
+    alleWachsen();
   }
 
   // ---------- Schritt 2
@@ -13997,6 +14011,7 @@ var qrcode = function() {
       inputHtml("widerstandsgrad", "Widerstandsgrad / Norm") +
       '</div><div style="margin-top:12px">' + inputHtml("bemerkungen", "Bemerkungen / festgestellte Mängel / Auflagen", { textarea: true }) + '</div></div>';
     el.innerHTML = html;
+    alleWachsen();
   }
 
   // ---------- Schritt 5
