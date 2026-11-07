@@ -169,6 +169,8 @@
         <p class="muted" id="listeLeer">Noch keine Stammdatenblätter geladen.</p>
         <div class="route" id="listeAktionen">
           <button class="btn klein" type="button" id="qrZeigen">Tour als QR-Code anzeigen</button>
+          <button class="btn klein" type="button" id="ergebnisScan">📷 Ergebnisse vom iPad empfangen</button>
+          <button class="btn gruen klein" type="button" id="ergebnisZeigen">📤 Ergebnisse an PC übertragen (QR)</button>
           <button class="btn sec klein" type="button" id="tourExport">Tour als Datei exportieren</button>
           <button class="btn sec klein" type="button" id="alleLaden">Alle fertigen PDFs herunterladen</button>
           <button class="btn sec klein" type="button" id="listeLeeren">Liste leeren</button>
@@ -13605,6 +13607,7 @@ var qrcode = function() {
   var ordner = $("ordner"), iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   if (iOS || !("webkitdirectory" in ordner)) $("ordnerBtn").classList.add("versteckt");
   else $("qrScan").classList.add("versteckt");
+  if (iOS) $("ergebnisScan").classList.add("versteckt");
   $("ordnerBtn").onclick = function () { ordner.click(); };
   ordner.addEventListener("change", function () {
     var f = Array.prototype.slice.call(ordner.files).filter(function (x) { return /\.pdf$/i.test(x.name); });
@@ -13661,6 +13664,7 @@ var qrcode = function() {
     var ul = $("personen"), fertig = liste.filter(function (p) { return p.fertig; }).length;
     $("listeLeer").classList.toggle("versteckt", liste.length > 0);
     $("listeAktionen").classList.toggle("versteckt", liste.length === 0);
+    $("ergebnisZeigen").classList.toggle("versteckt", !liste.some(function (p) { return p.fertig; }));
     $("zaehler").textContent = liste.length ? fertig + " von " + liste.length + " kontrolliert" : "";
     $("balken").style.width = liste.length ? (100 * fertig / liste.length) + "%" : "0";
     ul.innerHTML = liste.map(function (p, i) {
@@ -13731,7 +13735,7 @@ var qrcode = function() {
     setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
     meldung($("startMeldung"), "ok", "Tour-Datei <b>" + esc(name) + "</b> mit " + offen.length + " Person(en) wurde gespeichert. Diese eine Datei aufs Tablet schicken.");
   };
-  // ---------- Tour per QR-Code (offline: PC zeigt Codes, iPad scannt mit der Kamera)
+  // ---------- QR-Übertragung (offline). Hin: PC -> iPad (Tour). Zurück: iPad -> PC (Ergebnisse).
   var QR_TEIL = 450;
   async function packen(obj) {
     var bytes = new TextEncoder().encode(JSON.stringify(obj));
@@ -13744,7 +13748,7 @@ var qrcode = function() {
   async function entpacken(s) {
     var bytes = unb64(s.slice(1));
     if (s[0] === "d") {
-      if (!window.DecompressionStream) throw new Error("Dieses Gerät ist zu alt (iOS 16.4 oder neuer nötig).");
+      if (!window.DecompressionStream) throw new Error("Dieser Browser ist zu alt (iOS 16.4 / aktueller Edge oder Chrome nötig).");
       bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
     }
     return JSON.parse(new TextDecoder().decode(bytes));
@@ -13752,20 +13756,15 @@ var qrcode = function() {
   function qrOverlay(html) {
     var ov = document.createElement("div"); ov.className = "qr-ov"; ov.innerHTML = html; document.body.appendChild(ov); return ov;
   }
-  $("qrZeigen").onclick = async function () {
-    var offen = liste.filter(function (p) { return !p.fertig; });
-    if (!offen.length) { hinweis("Keine offenen Kontrollen in der Liste."); return; }
-    var jetzt = new Date();
-    var tour = { tourId: "tour-" + jetzt.getTime(), erstellt: jetzt.toISOString(), kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim(), qr: true,
-      personen: offen.map(function (p) { return { id: p.id, daten: p.daten, werte: p.werte, reihenfolge: p.reihenfolge }; }) };
-    var daten = await packen(tour), n = Math.ceil(daten.length / QR_TEIL), kennung = Math.random().toString(36).slice(2, 8);
+  async function qrAnzeigen(prefix, obj, titel, unten, teilGroesse) {
+    var daten = await packen(obj), tg = teilGroesse || QR_TEIL, n = Math.ceil(daten.length / tg), kennung = Math.random().toString(36).slice(2, 8);
     var teile = [];
-    for (var i = 0; i < n; i++) teile.push("WKQ1|" + kennung + "|" + (i + 1) + "|" + n + "|" + daten.slice(i * QR_TEIL, (i + 1) * QR_TEIL));
-    var ov = qrOverlay('<b style="font-size:18px">Tour mit ' + offen.length + ' Person(en) – auf dem iPad „Tour per QR-Code scannen“ antippen und hierauf richten</b>' +
+    for (var i = 0; i < n; i++) teile.push(prefix + "|" + kennung + "|" + (i + 1) + "|" + n + "|" + daten.slice(i * tg, (i + 1) * tg));
+    var ov = qrOverlay('<b style="font-size:18px">' + titel + '</b>' +
       '<canvas class="code"></canvas><div class="qr-punkte"></div>' +
       '<div class="route" style="justify-content:center"><button class="btn sec" type="button" data-q="pause">Pause</button>' +
       '<button class="btn" type="button" data-q="zu">Fertig / Schließen</button></div>' +
-      '<p class="muted klein" style="margin:0">Die Codes wechseln automatisch. Das Stammdatenblatt selbst wird nicht übertragen (keine Anlage im PDF).</p>');
+      '<p class="muted klein" style="margin:0">' + unten + '</p>');
     var cv = ov.querySelector("canvas"), punkte = ov.querySelector(".qr-punkte"), idx = 0, pause = false;
     punkte.innerHTML = teile.map(function (t, i) { return "<span>" + (i + 1) + "</span>"; }).join("");
     function zeichnen() {
@@ -13783,58 +13782,141 @@ var qrcode = function() {
       if (q === "pause") { pause = !pause; e.target.textContent = pause ? "Weiter" : "Pause"; }
       if (q === "zu") { clearInterval(timer); ov.remove(); }
     });
-  };
-  $("qrScan").onclick = async function () {
+    return teile.length;
+  }
+  async function qrScannen(prefix, titel, fertigFn) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      hinweis("Die Kamera ist hier nicht verfügbar. Bitte die App in Safari über die Webadresse öffnen (nicht aus „Dateien“)."); return;
+      hinweis("Die Kamera ist hier nicht verfügbar. Auf dem iPad die App in Safari über die Webadresse öffnen, am PC in Edge oder Chrome."); return;
     }
-    var ov = qrOverlay('<b style="font-size:18px">Kamera auf die QR-Codes am PC richten</b>' +
-      '<video playsinline muted autoplay></video><div class="qr-punkte"></div><div id="qrStatus" class="muted">Warte auf ersten Code …</div>' +
+    var ov = qrOverlay('<b style="font-size:18px">' + titel + '</b>' +
+      '<video playsinline muted autoplay></video><div class="qr-punkte"></div><div class="muted" data-status>Warte auf ersten Code …</div>' +
       '<button class="btn sec" type="button" data-q="zu">Abbrechen</button>');
-    var video = ov.querySelector("video"), punkte = ov.querySelector(".qr-punkte"), status = ov.querySelector("#qrStatus");
+    var video = ov.querySelector("video"), punkte = ov.querySelector(".qr-punkte"), status = ov.querySelector("[data-status]");
     var cv = document.createElement("canvas"), ctx = cv.getContext("2d", { willReadFrequently: true });
     var stream = null, laeuft = true, kennung = null, teile = [], n = 0;
+    var re = new RegExp("^" + prefix + "\\|([a-z0-9]+)\\|(\\d+)\\|(\\d+)\\|([\\s\\S]*)$");
     function ende() { laeuft = false; if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); ov.remove(); }
     ov.addEventListener("click", function (e) { if (e.target.getAttribute && e.target.getAttribute("data-q") === "zu") ende(); });
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
-    } catch (e) { ende(); hinweis("Kein Zugriff auf die Kamera. Bitte in Safari die Kamera für diese Seite erlauben."); return; }
+    } catch (e) { ende(); hinweis("Kein Zugriff auf die Kamera. Bitte die Kamera für diese Seite erlauben."); return; }
     video.srcObject = stream; try { await video.play(); } catch (e) {}
-    async function fertig() {
-      laeuft = false; status.textContent = "Alle Codes erfasst – Tour wird geladen …";
-      try {
-        var tour = await entpacken(teile.join(""));
-        ende(); await tourImport(tour, true);
-      } catch (e) { ende(); meldung($("startMeldung"), "err", "QR-Tour konnte nicht gelesen werden: " + esc(e.message || e)); }
-    }
     function schritt() {
       if (!laeuft) return;
       if (video.readyState >= 2 && video.videoWidth) {
-        var f = Math.min(1, 900 / Math.max(video.videoWidth, video.videoHeight));
+        var f = Math.min(1, 1000 / Math.max(video.videoWidth, video.videoHeight));
         cv.width = Math.round(video.videoWidth * f); cv.height = Math.round(video.videoHeight * f);
         ctx.drawImage(video, 0, 0, cv.width, cv.height);
         var code = jsQR(ctx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: "dontInvert" });
-        var m = code && /^WKQ1\|([a-z0-9]+)\|(\d+)\|(\d+)\|([\s\S]*)$/.exec(code.data);
+        var m = code && re.exec(code.data);
         if (m) {
           if (m[1] !== kennung) {
             kennung = m[1]; n = +m[3]; teile = new Array(n);
-            punkte.innerHTML = teile.map ? Array.apply(null, Array(n)).map(function (x, i) { return "<span>" + (i + 1) + "</span>"; }).join("") : "";
+            punkte.innerHTML = Array.apply(null, Array(n)).map(function (x, i) { return "<span>" + (i + 1) + "</span>"; }).join("");
           }
           var i = +m[2] - 1;
-          if (!teile[i]) {
-            teile[i] = m[4];
-            punkte.children[i].classList.add("ok");
-            if (navigator.vibrate) navigator.vibrate(30);
-          }
+          if (!teile[i]) { teile[i] = m[4]; punkte.children[i].classList.add("ok"); if (navigator.vibrate) navigator.vibrate(30); }
           var anz = teile.filter(Boolean).length;
           status.textContent = anz + " von " + n + " Codes erfasst";
-          if (anz === n) return fertig();
+          if (anz === n) {
+            laeuft = false; status.textContent = "Alle Codes erfasst – wird verarbeitet …";
+            entpacken(teile.join("")).then(function (obj) { ende(); return fertigFn(obj); })
+              .catch(function (e) { ende(); meldung($("startMeldung"), "err", "QR-Daten konnten nicht gelesen werden: " + esc(e.message || e)); });
+            return;
+          }
         }
       }
       setTimeout(schritt, 120);
     }
     schritt();
+  }
+
+  // Hin: Tour vom PC aufs iPad
+  $("qrZeigen").onclick = function () {
+    var offen = liste.filter(function (p) { return !p.fertig; });
+    if (!offen.length) { hinweis("Keine offenen Kontrollen in der Liste."); return; }
+    var jetzt = new Date();
+    var tour = { tourId: "tour-" + jetzt.getTime(), erstellt: jetzt.toISOString(), kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim(), qr: true,
+      personen: offen.map(function (p) { return { id: p.id, daten: p.daten, werte: p.werte, reihenfolge: p.reihenfolge }; }) };
+    qrAnzeigen("WKQ1", tour, "Tour mit " + offen.length + " Person(en) – auf dem iPad „Tour per QR-Code scannen“ antippen und hierauf richten",
+      "Die Codes wechseln automatisch. Das Stammdatenblatt selbst bleibt am PC (es wird beim Zurückübertragen wieder angehängt).");
   };
+  $("qrScan").onclick = function () {
+    qrScannen("WKQ1", "Kamera auf die QR-Codes am PC richten", function (tour) { return tourImport(tour, true); });
+  };
+
+  // Unterschrift kompakt (Linienzüge) – passt in QR-Codes; am PC wird daraus wieder ein Bild
+  function sigVecBild(v) {
+    var k = 2, c = document.createElement("canvas"); c.width = Math.round(v.w * k); c.height = Math.round(v.h * k);
+    var g = c.getContext("2d"); g.setTransform(k, 0, 0, k, 0, 0);
+    g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = "#0b1f4d"; g.fillStyle = "#0b1f4d";
+    v.s.forEach(function (z) {
+      var x = z[0] / 2, y = z[1] / 2;
+      g.beginPath(); g.arc(x, y, 1, 0, Math.PI * 2); g.fill();
+      for (var i = 3; i + 2 < z.length; i += 3) {
+        var nx = x + z[i] / 2, ny = y + z[i + 1] / 2;
+        g.lineWidth = z[i + 2] / 10; g.beginPath(); g.moveTo(x, y); g.lineTo(nx, ny); g.stroke();
+        x = nx; y = ny;
+      }
+    });
+    return c.toDataURL("image/png");
+  }
+  async function bildVerkleinern(url) {
+    // Ersatz für ältere Unterschriften ohne Linienzüge: kleines Schwarz-Weiß-PNG
+    var im = new Image(); im.src = url; await new Promise(function (r) { im.onload = r; im.onerror = r; });
+    var w = Math.min(500, im.width || 500), h = Math.round(w * (im.height || 125) / (im.width || 500));
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var g = c.getContext("2d"); g.drawImage(im, 0, 0, w, h);
+    return c.toDataURL("image/png");
+  }
+  // Zurück: Ergebnisse vom iPad zum PC
+  $("ergebnisZeigen").onclick = async function () {
+    var fertig = liste.filter(function (p) { return p.fertig; });
+    if (!fertig.length) { hinweis("Noch keine abgeschlossenen Kontrollen."); return; }
+    var personen = [];
+    for (var i = 0; i < fertig.length; i++) {
+      var p = fertig[i], e = { id: p.id, daten: p.daten, werte: Object.assign({}, p.werte, { abschluss_vermerk: p.ergebnis.vermerk }), vec: {}, png: {} };
+      for (var k of ["besitzer", "kontrolleur"]) {
+        if (p.sigVec && p.sigVec[k] && p.sigVec[k].ok !== false && p.sigVec[k].s.length && p.sig[k]) e.vec[k] = { w: p.sigVec[k].w, h: p.sigVec[k].h, s: p.sigVec[k].s };
+        else if (p.sig && p.sig[k]) e.png[k] = await bildVerkleinern(p.sig[k]);
+      }
+      personen.push(e);
+    }
+    var n = await qrAnzeigen("WKR1", { typ: "ergebnis", erstellt: new Date().toISOString(), personen: personen },
+      fertig.length + " abgeschlossene Kontrolle(n) – am PC „Ergebnisse vom iPad empfangen“ klicken und die Webcam hierauf richten",
+      "Die Codes wechseln automatisch. Am PC entsteht daraus das fertige PDF mit Unterschriften und Stammdatenblatt.", 600);
+  };
+  $("ergebnisScan").onclick = function () {
+    qrScannen("WKR1", "iPad mit den QR-Codes vor die Webcam halten", ergebnisImport);
+  };
+  async function ergebnisImport(obj) {
+    var m = $("startMeldung"), ok = [], fehler = [];
+    for (var i = 0; i < obj.personen.length; i++) {
+      var e = obj.personen[i], name = (e.daten.person && e.daten.person[0]) || e.id;
+      try {
+        meldung(m, "ok", "Erzeuge PDF " + (i + 1) + " von " + obj.personen.length + ": " + esc(name) + " …");
+        var p = liste.filter(function (x) { return x.id === e.id; })[0];
+        if (!p) {
+          p = { id: e.id, daten: e.daten, original: null, werte: {}, sig: {}, schritt: 6, status: "offen", fertig: false, reihenfolge: Date.now() + i };
+          liste.push(p);
+        }
+        var sigUrl = {}, sigBytes = {};
+        ["besitzer", "kontrolleur"].forEach(function (k) {
+          if (e.vec && e.vec[k]) sigUrl[k] = sigVecBild(e.vec[k]); else if (e.png && e.png[k]) sigUrl[k] = e.png[k];
+          if (sigUrl[k]) sigBytes[k] = unb64(sigUrl[k].split(",")[1]);
+        });
+        var vw = e.werte.zugang === "Nein";
+        var fehlend = vw ? 0 : e.daten.items.filter(function (it, j) { return e.werte["pos" + pos(j) + "_vorhanden"] === "Nein"; }).length;
+        var r = await WK.abschliessen(PDFLib, e.daten, p.original, e.werte, sigBytes, { anlage: !!p.original, logo: logoBytes() });
+        p.werte = e.werte; p.sig = sigUrl; p.fertig = true; p.status = "fertig"; p.pdf = r.bytes; p.schritt = 6;
+        p.ergebnis = { name: r.name, hash: r.hash, vermerk: e.werte.abschluss_vermerk, nichtVorhanden: fehlend, verweigert: vw, vomIpad: true };
+        await dbPut(p); ok.push(name);
+      } catch (err) { console.error(err); fehler.push(name + ": " + (err.message || err)); }
+    }
+    listeZeigen();
+    meldung(m, fehler.length ? "warn" : "ok", ok.length + " Protokoll(e) vom iPad übernommen" + (ok.length ? ": " + esc(ok.join(", ")) : "") +
+      ". Mit „Alle fertigen PDFs herunterladen“ speichern." + (fehler.length ? "<br><b>Fehler:</b> " + esc(fehler.join("; ")) : ""));
+  }
 
   async function tourImport(tour, manuell) {
     var schon = (lsGet("wk_touren") || "").split(",");
@@ -14117,7 +14199,7 @@ var qrcode = function() {
 
   function sigPad(wer) {
     var cv = $("sig_" + wer), ctx = cv.getContext("2d"), leer = $("leer_" + wer), stat = $("stat_" + wer);
-    var ratio = Math.max(window.devicePixelRatio || 1, 2), malt = false, last = null;
+    var ratio = Math.max(window.devicePixelRatio || 1, 2), malt = false, last = null, vecZug = null, vecX = 0, vecY = 0;
     function groesse() {
       var r = cv.getBoundingClientRect();
       cv.width = Math.round(r.width * ratio); cv.height = Math.round(r.height * ratio);
@@ -14139,6 +14221,14 @@ var qrcode = function() {
       e.preventDefault(); malt = true; cv.setPointerCapture(e.pointerId); last = punkt(e);
       ctx.beginPath(); ctx.arc(last.x, last.y, 1, 0, Math.PI * 2); ctx.fillStyle = "#0b1f4d"; ctx.fill();
       leer.style.display = "none";
+      var rr = cv.getBoundingClientRect();
+      if (!st.sigVec) st.sigVec = {};
+      var v = st.sigVec[wer];
+      if (!v || (!st.sig[wer] && v.s.length) || Math.abs(v.w - rr.width) > 1 || Math.abs(v.h - rr.height) > 1) {
+        // neue Vektor-Aufzeichnung; vorhandene Bild-Unterschrift ohne Vektoren -> Vektoren ungültig
+        v = st.sigVec[wer] = { w: Math.round(rr.width), h: Math.round(rr.height), s: [], ok: !st.sig[wer] };
+      }
+      vecZug = [Math.round(last.x * 2), Math.round(last.y * 2), 0]; vecX = vecZug[0]; vecY = vecZug[1]; v.s.push(vecZug);
     });
     cv.addEventListener("pointermove", function (e) {
       if (!malt) return;
@@ -14150,18 +14240,22 @@ var qrcode = function() {
         ctx.lineWidth = e.pointerType === "pen" ? 1.2 + p.p * 2.2 : 2.2;
         ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
         last = p;
+        if (vecZug) {
+          var qx = Math.round(p.x * 2), qy = Math.round(p.y * 2);
+          if (Math.abs(qx - vecX) + Math.abs(qy - vecY) >= 2) { vecZug.push(qx - vecX, qy - vecY, Math.round(ctx.lineWidth * 10)); vecX = qx; vecY = qy; }
+        }
       });
     });
     function ende() {
       if (!malt) return;
-      malt = false;
+      malt = false; vecZug = null;
       st.sig[wer] = cv.toDataURL("image/png");
       speichern(); anzeigen(); navAktualisieren();
     }
     cv.addEventListener("pointerup", ende);
     cv.addEventListener("pointercancel", ende);
     $("del_" + wer).onclick = function () {
-      ctx.clearRect(0, 0, cv.width, cv.height); delete st.sig[wer]; speichern(); anzeigen(); navAktualisieren();
+      ctx.clearRect(0, 0, cv.width, cv.height); delete st.sig[wer]; if (st.sigVec) delete st.sigVec[wer]; speichern(); anzeigen(); navAktualisieren();
     };
     groesse();
   }
