@@ -679,6 +679,7 @@
       txt(sx, y - sh - 11, "Ort, Datum, Unterschrift " + r[0], F.n, 7.5, GRAU);
       feld("name_" + r[1], sx, y - sh - 33, sb, 16, false, 10, vor["name_" + r[1]]);
       txt(sx, y - sh - 41, "Name in Druckbuchstaben", F.n, 6.5, GRAU);
+      if (r[1] === "kontrolleur") txt(sx, y - sh - 53, "Sachbearbeiter Waffen & Sprengstoff", F.b, 8.5, DUNKEL);
     });
     for (var si = 0; si < sigs.length; si++) {
       var sg = sigs[si], im = await pdf.embedPng(sg.png);
@@ -686,7 +687,7 @@
       sg.page.drawImage(im, { x: sg.x + (sg.w - im.width * sc) / 2, y: sg.y + (sg.h - im.height * sc) / 2,
         width: im.width * sc, height: im.height * sc });
     }
-    y -= sh + 78;
+    y -= sh + 90;
     if (S) {
       txt(RAND, y + 14, WERTE.abschluss_vermerk || "", F.b, 9);
     } else {
@@ -1303,7 +1304,7 @@
     var wzBlock = new Array(40).join(new Array(8).join(wz) + "\n");
     el.innerHTML = '<h2>Unterschriften</h2>' +
       '<p>Die Kontrolle wurde in meinem Beisein durchgeführt. Die Angaben sind zutreffend.</p>' +
-      [["besitzer", "Waffenbesitzer/in"], ["kontrolleur", "Kontrollierende/r"]].map(function (r) {
+      [["besitzer", "Waffenbesitzer/in"], ["kontrolleur", "Kontrollierende/r · Sachbearbeiter Waffen & Sprengstoff"]].map(function (r) {
         return '<div class="card"><h3>Unterschrift ' + r[1] + '</h3>' +
           '<div class="sigwrap"><div class="wz">' + esc(wzBlock) + '</div><canvas id="sig_' + r[0] + '"></canvas>' +
           '<div class="leer" id="leer_' + r[0] + '">Hier mit Finger oder Stift unterschreiben</div></div>' +
