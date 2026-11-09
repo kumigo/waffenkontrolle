@@ -13465,7 +13465,9 @@ var qrcode = function() {
     var str = plzIdx > 0 ? adr.slice(0, plzIdx).join(", ") : (adr[0] || "");
     var ort = plzIdx >= 0 ? adr[plzIdx] : (adr[1] || ""), ortsteil = plzIdx >= 0 ? adr.slice(plzIdx + 1).join(", ") : "";
     var bd = datumParse(werte.bescheid_datum) || new Date();
-    var bis = new Date(bd.getTime()); bis.setDate(bis.getDate() + (+V.frist_tage || 30));
+    // Zahlungsziel: ein Monat nach Erstellung (am Monatsende auf den letzten Tag begrenzt)
+    var bis = new Date(bd.getFullYear(), bd.getMonth() + 1, 1);
+    bis.setDate(Math.min(bd.getDate(), new Date(bis.getFullYear(), bis.getMonth() + 1, 0).getDate()));
     var gMin = zahl(V.gebuehr_min) || 0, geb = zahl(werte.gebuehr); if (geb == null) geb = gMin;
     var ausl = zahl(V.auslagen) || 0;
     var an = werte.anrede;
@@ -13474,14 +13476,20 @@ var qrcode = function() {
       Anrede_2: an === "Herr" ? "Sehr geehrter Herr" : (an === "Frau" ? "Sehr geehrte Frau" : "Guten Tag " + t.slice(0, -1).join(" ")),
       Vorname: t.slice(0, -1).join(" "), Nachname: t.length > 1 ? t[t.length - 1] : name,
       Str__Hausnr: str, PLZ__Ort: ort, Ortsteil: ortsteil,
-      Aktenzeichen: werte.aktenzeichen != null && String(werte.aktenzeichen).trim() ? String(werte.aktenzeichen).trim() : (d.dok_nr || ""),
+      Aktenzeichen: werte.aktenzeichen != null && String(werte.aktenzeichen).trim() ? String(werte.aktenzeichen).trim() : aktenzeichenAus(d),
       Kontrolle_am: werte.kontrolle_datum || "", Datum: datumLang(bd), Datum_kurz: datumKurz(bd), Zahlbar_bis: datumKurz(bis),
       Gebuehr: euro(geb), Auslagen: euro(ausl), Betrag: euro(geb + ausl),
       Gebuehr_Festsetzung: Math.abs(geb - gMin) < 0.005 ? "auf den Mindestbetrag von " + euro(geb) + " EUR" : "auf " + euro(geb) + " EUR",
       Aufwand: String(werte.aufwand || V.aufwand || "eine Stunde").trim(),
     };
+    // Sachbearbeiter/in je nach Kontrollierendem (Zimmer, Durchwahl)
+    var sbs = V.sachbearbeiter || [], k = String(werte.kontrolleur || werte.name_kontrolleur || "").toLowerCase(), sb = null;
+    sbs.forEach(function (x) { if (!sb && x.name && k.indexOf(String(x.name).toLowerCase()) >= 0) sb = x; });
+    sb = sb || sbs[0] || {};
+    f.SB_Name = ((sb.anrede || "") + " " + (sb.name || "")).trim(); f.SB_Zimmer = sb.zimmer || ""; f.SB_Durchwahl = sb.durchwahl || "";
     return f;
   }
+  function aktenzeichenAus(d) { return String((d && d.dok_nr) || "").split("/")[0].trim(); }
   function einsetzen(s, f) { return String(s || "").replace(/«([^»]+)»/g, function (m, k) { return f[k] != null ? f[k] : ""; }); }
 
   async function kostenbescheid(PDFLib, d, werte, V, optionen) {
@@ -13558,7 +13566,7 @@ var qrcode = function() {
     if (V.ruecksende) txt(L, ay, einsetzen(V.ruecksende, f), F.n, 6.5, GRAU);
     ay -= 8 * mm;
     [f.Anrede, f.Vorname + " " + f.Nachname, f.Str__Hausnr, (f.PLZ__Ort + " " + f.Ortsteil).trim()].forEach(function (z, i) {
-      txt(L, ay - i * 12.5 - (i > 0 ? 6 : 0), z, F.n, 10.5);
+      txt(L, ay - i * 12.5, z, F.n, 10.5);
     });
     // Infoblock rechts
     var ix = 122 * mm, iv = ix + 25 * mm, iy = H - 45 * mm;
@@ -13604,7 +13612,7 @@ var qrcode = function() {
   }
 
   global.Waffenkontrolle = { sha256js: sha256js, verarbeiten: verarbeiten, einfrieren: einfrieren, lesen: lesen, abschliessen: abschliessen,
-    kaliberListe: kaliberListe, dateiname: dateiname, kostenbescheid: kostenbescheid, bescheidFelder: bescheidFelder, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, GRUENDE: GRUENDE, EXTRA_KALIBER: 3 };
+    kaliberListe: kaliberListe, dateiname: dateiname, kostenbescheid: kostenbescheid, bescheidFelder: bescheidFelder, aktenzeichenAus: aktenzeichenAus, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, GRUENDE: GRUENDE, EXTRA_KALIBER: 3 };
 })(typeof window !== "undefined" ? window : globalThis);
 
 </script>
@@ -14586,7 +14594,7 @@ var qrcode = function() {
         if (!st.werte.kontrolle_bis) st.werte.kontrolle_bis = jetztZeit();
         if (bescheidMoeglich(st)) {
           st.werte.bescheid_datum = heute();
-          if (st.werte.aktenzeichen == null) st.werte.aktenzeichen = st.daten.dok_nr || "";
+          if (st.werte.aktenzeichen == null) st.werte.aktenzeichen = WK.aktenzeichenAus(st.daten);
           if (st.werte.gebuehr == null) st.werte.gebuehr = vorlage().gebuehr_min || "";
         }
         var werte = Object.assign({}, st.werte, {
@@ -14697,7 +14705,7 @@ var qrcode = function() {
     if (!V) return '<div class="card"><h3>Kostenbescheid</h3><p class="hinweisbox warn" style="margin:0">Keine Kostenbescheid-Vorlage auf diesem Gerät. Sie kommt mit der nächsten Tour vom PC; ' +
       'der Kostenbescheid entsteht dann auch beim Zurückübertragen am PC.</p></div>';
     var w = st.werte;
-    if (w.aktenzeichen == null) w.aktenzeichen = st.daten.dok_nr || "";
+    if (w.aktenzeichen == null) w.aktenzeichen = WK.aktenzeichenAus(st.daten);
     if (w.gebuehr == null) w.gebuehr = V.gebuehr_min || "";
     if (w.aufwand == null) w.aufwand = V.aufwand || "eine Stunde";
     return '<div class="card"><h3>Kostenbescheid</h3>' +
