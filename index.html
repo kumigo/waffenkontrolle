@@ -200,30 +200,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <h3 style="margin-top:0">Logo für das Protokoll</h3>
-        <p class="muted klein" style="margin-top:0">Wird oben links auf jedes Protokoll gedruckt. Es bleibt nur auf diesem Gerät gespeichert (auch auf dem iPad einmal auswählen).</p>
-        <div class="route" style="align-items:center">
-          <img id="logoVorschau" alt="" style="max-height:48px;max-width:160px;display:none;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff">
-          <button class="btn sec klein" type="button" id="logoWaehlen">Logo auswählen …</button>
-          <button class="btn sec klein versteckt" type="button" id="logoWeg">Logo entfernen</button>
-        </div>
-        <input id="logoIn" type="file" accept="image/png,image/jpeg" hidden>
-        <p class="klein" id="vorlageStatus" style="margin:12px 0 0"></p>
-      </div>
-      <div class="card klein muted">
-        Alles läuft nur in diesem Browser und wird nur hier gespeichert. Es wird nichts hochgeladen.
-        <details class="werkzeuge" style="margin-top:10px">
-          <summary>Weitere Funktionen (ausfüllbarer PDF-Bogen für Acrobat, Bogen einfrieren)</summary>
-          <div class="route">
-            <button class="btn sec klein" id="wPdf" type="button">Ausfüllbaren PDF-Bogen erzeugen …</button>
-            <button class="btn sec klein" id="wFreeze" type="button">Unterschriebenen PDF-Bogen einfrieren …</button>
-          </div>
-          <input id="wPdfIn" type="file" accept="application/pdf,.pdf" multiple hidden>
-          <input id="wFreezeIn" type="file" accept="application/pdf,.pdf" multiple hidden>
-          <ul class="liste" id="wListe"></ul>
-        </details>
-      </div>
     </section>
 
     <section id="s-1" class="versteckt"></section>
@@ -13795,7 +13771,10 @@ var qrcode = function() {
   meinName.addEventListener("change", besetzungUebernehmen);
   begleiterIn.addEventListener("change", besetzungUebernehmen);
   // Logo (nur lokal gespeichert)
-  function logoBytes() { var u = lsGet("wk_logo"); return u ? unb64(u.split(",")[1]) : null; }
+  function logoBytes() {
+    var u = lsGet("wk_logo"); if (u) return unb64(u.split(",")[1]);
+    var V = vorlage(); return V && V.wappen ? unb64(V.wappen.split(",")[1]) : null;
+  }
   // Kostenbescheid-Vorlage (Briefkopf, Texte, Bankdaten) – nur lokal gespeichert bzw. in der Datei für den PC enthalten
   function vorlage() {
     var v = null;
@@ -13838,27 +13817,6 @@ var qrcode = function() {
       }
     } catch (e) { ov.querySelector(".seiten").innerHTML = '<p class="hinweisbox err">Anzeige nicht möglich: ' + esc(e.message || e) + "</p>"; }
   }
-  function logoZeigen() {
-    var u = lsGet("wk_logo"), im = $("logoVorschau");
-    im.style.display = u ? "" : "none"; if (u) im.src = u;
-    $("logoWeg").classList.toggle("versteckt", !u);
-  }
-  $("logoWaehlen").onclick = function () { $("logoIn").click(); };
-  $("logoWeg").onclick = function () { try { localStorage.removeItem("wk_logo"); } catch (e) {} logoZeigen(); };
-  $("logoIn").addEventListener("change", function () {
-    var f = this.files[0]; this.value = ""; if (!f) return;
-    var im = new Image(), url = URL.createObjectURL(f);
-    im.onload = function () {
-      // verkleinern und als PNG speichern (passt sicher in den Speicher)
-      var sk = Math.min(1, 600 / Math.max(im.width, im.height)), c = document.createElement("canvas");
-      c.width = Math.round(im.width * sk); c.height = Math.round(im.height * sk);
-      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-      lsSet("wk_logo", c.toDataURL("image/png")); URL.revokeObjectURL(url); logoZeigen();
-    };
-    im.onerror = function () { hinweis("Das Bild konnte nicht gelesen werden (PNG oder JPG verwenden)."); };
-    im.src = url;
-  });
-  logoZeigen();
 
   var drop = $("drop"), datei = $("datei");
   drop.addEventListener("click", function () { datei.click(); });
@@ -14228,7 +14186,7 @@ var qrcode = function() {
     }
     if (tour.kontrolleur) { meinName.value = tour.kontrolleur; lsSet("wk_kontrolleur", tour.kontrolleur); }
     if (tour.begleiter != null) { begleiterIn.value = tour.begleiter; lsSet("wk_begleiter", tour.begleiter); }
-    if (tour.logo && !lsGet("wk_logo")) { lsSet("wk_logo", tour.logo); logoZeigen(); }
+    if (tour.logo && !lsGet("wk_logo")) { lsSet("wk_logo", tour.logo); }
     if (tour.bescheid && tour.bescheid.text) {
       var altV = null; try { altV = JSON.parse(lsGet("wk_bescheid") || "null"); } catch (e) {}
       var nV = Object.assign({}, tour.bescheid);
@@ -14731,31 +14689,6 @@ var qrcode = function() {
     if (p.bescheid) $("bescheidAnsehen").onclick = function () { pdfAnzeigen(p.bescheid, "Kostenbescheid", p.bescheidName); };
     $("zurListe").onclick = startZeigen;
   }
-
-  // ---------- Weitere Funktionen
-  function wEintrag(t) { var li = document.createElement("li"); li.textContent = t; $("wListe").appendChild(li); return li; }
-  $("wPdf").onclick = function () { $("wPdfIn").click(); };
-  $("wFreeze").onclick = function () { $("wFreezeIn").click(); };
-  $("wPdfIn").onchange = async function () {
-    var fs = Array.prototype.slice.call(this.files); this.value = "";
-    for (var i = 0; i < fs.length; i++) {
-      var li = wEintrag(fs[i].name + " …");
-      try {
-        var r = await WK.verarbeiten(pdfjs, PDFLib, new Uint8Array(await fs[i].arrayBuffer()), { kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim(), logo: logoBytes() });
-        herunterladen(r.bytes, r.name); li.textContent = "✓ " + r.name;
-      } catch (e) { li.textContent = "Fehler bei " + fs[i].name + ": " + (e.message || e); }
-    }
-  };
-  $("wFreezeIn").onchange = async function () {
-    var fs = Array.prototype.slice.call(this.files); this.value = "";
-    for (var i = 0; i < fs.length; i++) {
-      var li = wEintrag(fs[i].name + " …");
-      try {
-        var r = await WK.einfrieren(pdfjs, PDFLib, new Uint8Array(await fs[i].arrayBuffer()), fs[i].name);
-        herunterladen(r.bytes, r.name); li.textContent = "✓ " + r.name;
-      } catch (e) { li.textContent = "Fehler bei " + fs[i].name + ": " + (e.message || e); }
-    }
-  };
 
   // ---------- Start
   try { localStorage.removeItem("wk_entwurf_v1"); } catch (e) {}
