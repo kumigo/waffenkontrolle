@@ -125,6 +125,11 @@
   .personen { list-style:none; margin:0; padding:0; }
   .person { display:flex; gap:14px; align-items:center; padding:14px; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; background:#fff; }
   .person.fertig { background:var(--ok-bg); border-color:#9fd3b2; }
+  .person.na { background:#fff6d6; border-color:#e6c35a; }
+  .person.na .status { background:#d9a514 !important; color:#fff; }
+  .jn button.na.an { background:#d9a514; color:#fff; }
+  .hinweisbox.gelb { background:#fff6d6; border:1px solid #e6c35a; color:#6b4f00; }
+  .chips.blau .chip.an { background:#1f5fa8; border-color:#1f5fa8; }
   .person.begonnen { border-color:#e3c27a; background:#fffaf0; }
   .person .status { flex:0 0 44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     font-size:22px; font-weight:700; background:#eef1f5; color:var(--muted); }
@@ -12713,6 +12718,7 @@ var qrcode = function() {
   // Fragen zur Aufbewahrung (Ja/Nein) – hier frei anpassbar
   var FRAGEN = [
     "Mängel festgestellt",
+    "Verstoß festgestellt (Dokumentation in Anlage 1)",
   ];
   // Kontrolle gestattet (zugang = "Ja") / verweigert (zugang = "Nein") – bei "Nein" entfällt die Prüfung der Waffen/Munition/Aufbewahrung.
   var GRUENDE = [["grund_erkrankung", "Erkrankung"], ["grund_termin", "anderer Termin"], ["grund_gaeste", "Gästen"]];
@@ -13242,6 +13248,7 @@ var qrcode = function() {
     var kx1 = RAND + 6, kx2 = RAND + 190;
     kaestchen("zugang", "Ja", kx1, y - 32, "gestattet");
     kaestchen("zugang", "Nein", kx2, y - 32, "verweigert");
+    kaestchen("zugang", "NA", RAND + 360, y - 32, "nicht angetroffen");
     txt(kx2 - 34, y - 50 + 1.5, "wegen", F.n, 9);
     GRUENDE.forEach(function (g, i) { kaestchen(g[0], null, kx2 + i * 105, y - 50, g[1]); });
     txt(RAND + 6, y - 68 + 1.5, "sonstiger Grund (bitte benennen):", F.n, 9);
@@ -13258,12 +13265,15 @@ var qrcode = function() {
       linie(RAND, y - 18, W - RAND, y - 18, 0.3, rgb(0.87, 0.87, 0.87));
       y -= 19;
     });
-    var VERWEIGERT = S && WERTE.zugang === "Nein";
+    var NA = S && WERTE.zugang === "NA";
+    var VERWEIGERT = S && (WERTE.zugang === "Nein" || NA);
     if (VERWEIGERT) {
       y -= 8;
-      page.drawRectangle({ x: RAND, y: y - 30, width: W - 2 * RAND, height: 30, color: rgb(0.99, 0.93, 0.92), borderColor: rgb(0.70, 0.15, 0.12), borderWidth: 1 });
-      txt(RAND + 10, y - 13, "Kontrolle verweigert", F.b, 10, rgb(0.70, 0.15, 0.12));
-      txt(RAND + 10, y - 25, "Die Aufbewahrungskontrolle konnte nicht durchgeführt werden.", F.n, 9);
+      var kf = NA ? rgb(1, 0.96, 0.78) : rgb(0.99, 0.93, 0.92), kr = NA ? rgb(0.72, 0.53, 0.04) : rgb(0.70, 0.15, 0.12);
+      page.drawRectangle({ x: RAND, y: y - 30, width: W - 2 * RAND, height: 30, color: kf, borderColor: kr, borderWidth: 1 });
+      txt(RAND + 10, y - 13, NA ? "Niemand angetroffen" : "Kontrolle verweigert", F.b, 10, kr);
+      txt(RAND + 10, y - 25, NA ? "Die Aufbewahrungskontrolle konnte nicht durchgeführt werden, da niemand angetroffen wurde."
+        : "Die Aufbewahrungskontrolle konnte nicht durchgeführt werden.", F.n, 9);
       y -= 30;
     }
     y -= 16;
@@ -13413,8 +13423,94 @@ var qrcode = function() {
         width: im.width * sc, height: im.height * sc });
     }
     y -= sh + 90;
-    if (S) {
+    // ---- Anlage 1: Dokumentation eines Verstoßes (nur wenn "Verstoß festgestellt" = Ja)
+    var ANLAGE = S && WERTE.frage02 === "Ja";
+    var anlageSigs = [];
+    if (ANLAGE) {
+      var hauptY = y, hauptPage = page;
+      fusszeile(); page = null;
+      page = pdf.addPage([W, H]); seite++; y = H - RAND;
+      var lxA = RAND;
+      if (LOGO) {
+        var lhA = 34, lwA = LOGO.width * lhA / LOGO.height;
+        if (lwA > 120) { lwA = 120; lhA = LOGO.height * lwA / LOGO.width; }
+        page.drawImage(LOGO, { x: RAND, y: y - 30 + (34 - lhA) / 2, width: lwA, height: lhA });
+        lxA = RAND + lwA + 12;
+      }
+      txt(lxA, y - 13, "Anlage 1 zur Aufbewahrungskontrolle vom " + (WERTE.kontrolle_datum || ""), F.b, 13);
+      txt(lxA, y - 26, fit([d.behoerde, name, "Dok-Nr. " + (d.dok_nr || "")].filter(Boolean).join("  ·  "), F.n, 8.5, W - RAND - lxA), F.n, 8.5, DUNKEL);
+      linie(RAND, y - 34, W - RAND, y - 34, 0.8, DUNKEL);
+      y -= 44;
+      abschnittNr = 0;
+      function anlAbschnitt(t) {
+        page.drawRectangle({ x: RAND, y: y - 16, width: W - 2 * RAND, height: 16, color: KOPF });
+        txt(RAND + 6, y - 11.5, t, F.b, 10); y -= 22;
+      }
+      function anlText(label, key, hMin) {
+        var z = umbrechen(WERTE[key] || "", F.n, 9.5, W - 2 * RAND - 6);
+        var h = Math.min(Math.max(hMin, z.length * 9.5 * 1.15 + 8), 260);
+        if (y - h - 14 < 30 * mm) { fusszeile(); page = pdf.addPage([W, H]); seite++; y = H - RAND; }
+        if (label) { txt(RAND, y - 8, label, F.n, 7, GRAU); y -= 10; }
+        feld(key, RAND, y - h, W - 2 * RAND, h, true, 9.5);
+        y -= h + 10;
+      }
+      anlAbschnitt("Waffenbesitzer/in");
+      var adrA = d.person.slice(1).filter(function (z) { return !/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(z); }).join(", ");
+      [["Name", name], ["Az.", aktenzeichenAus(d)], ["Adresse", adrA]].forEach(function (kv) {
+        txt(RAND + 6, y - 10, kv[0] + ":", F.n, 8, GRAU); txt(RAND + 60, y - 10, fit(kv[1], F.n, 9.5, W - 2 * RAND - 66), F.n, 9.5); y -= 14;
+      });
+      y -= 6;
+      anlAbschnitt("Art des Verstoßes");
+      y += 4;
+      kaestchen("vs_straftat", null, RAND + 6, y - 14, "Straftat");
+      kaestchen("vs_owi", null, RAND + 190, y - 14, "Ordnungswidrigkeit");
+      y -= 26;
+      anlAbschnitt("Sachverhaltsdarstellung"); anlText("", "vs_sachverhalt", 90);
+      anlAbschnitt("Zeuge/n – Name und Funktion"); anlText("", "vs_zeugen", 30);
+      anlAbschnitt("Maßnahmen");
+      y += 4;
+      kaestchen("vs_widerruf", null, RAND + 6, y - 14, "Einleitung Widerrufsverfahren");
+      kaestchen("vs_bussgeld", null, RAND + 190, y - 14, "Einleitung Bußgeldverfahren");
+      y -= 22;
+      txt(RAND + 6, y - 10, "Sonstiges:", F.n, 9);
+      feld("vs_sonstiges", RAND + 60, y - 14, W - 2 * RAND - 60, 16, false, 9);
+      y -= 26;
+      if (y - 140 < 30 * mm) { fusszeile(); page = pdf.addPage([W, H]); seite++; y = H - RAND; }
+      anlAbschnitt("Betroffene/r");
+      txt(RAND + 6, y - 10, "Ich gebe den Verstoß zu:", F.n, 9);
+      txt(RAND + 160, y - 4, "Ja", F.b, 7.5); txt(RAND + 186, y - 4, "Nein", F.b, 7.5);
+      jn("vs_zugegeben", RAND + 164, y - 16);
+      y -= 24;
+      anlText("wenn Nein, Erklärung:", "vs_erklaerung", 50);
+      anlAbschnitt("Bemerkungen"); anlText("", "vs_bemerkungen", 50);
+      if (y - 130 < 20 * mm) { fusszeile(); page = pdf.addPage([W, H]); seite++; y = H - RAND; }
+      y -= 4;
+      txt(RAND, y - 8, "Ort, Datum: " + [WERTE.kontrolle_ort, WERTE.kontrolle_datum].filter(Boolean).join(", "), F.n, 9);
+      y -= 18;
+      [["Waffenbehörde", "kontrolleur_a1", "name_kontrolleur"], ["Waffenbesitzer/in", "besitzer_a1", "name_besitzer"]].forEach(function (r, i) {
+        var sx = RAND + i * (sb + 16);
+        wasserzeichen(sx, y - sh, sb, sh);
+        page.drawRectangle({ x: sx, y: y - sh, width: sb, height: sh, borderColor: FELD_RAND, borderWidth: 0.7, borderDashArray: [3, 2] });
+        var sg2 = optionen.unterschriften && optionen.unterschriften[r[1]];
+        if (sg2) anlageSigs.push({ png: sg2, x: sx, y: y - sh, w: sb, h: sh, page: page });
+        else if (!optionen.vorschau) streichen(sx, y - sh, sb, sh);
+        linie(sx, y - sh - 1, sx + sb, y - sh - 1, 0.8, DUNKEL);
+        txt(sx, y - sh - 11, "Unterschrift " + r[0], F.n, 7.5, GRAU);
+        txt(sx, y - sh - 24, WERTE[r[2]] || "", F.n, 9);
+      });
+      y -= sh + 62;
       txt(RAND, y + 14, WERTE.abschluss_vermerk || "", F.b, 9);
+      for (var ai = 0; ai < anlageSigs.length; ai++) {
+        var ag = anlageSigs[ai], aim = await pdf.embedPng(ag.png);
+        var asc = Math.min((ag.w - 6) / aim.width, (ag.h - 6) / aim.height);
+        ag.page.drawImage(aim, { x: ag.x + (ag.w - aim.width * asc) / 2, y: ag.y + (ag.h - aim.height * asc) / 2, width: aim.width * asc, height: aim.height * asc });
+      }
+      var anlPage = page, anlY = y;
+      page = hauptPage; txt(RAND, hauptY + 14, WERTE.abschluss_vermerk || "", F.b, 9);
+      page = anlPage; y = anlY;
+    }
+    if (S) {
+      if (!ANLAGE) txt(RAND, y + 14, WERTE.abschluss_vermerk || "", F.b, 9);
     } else {
 
     // ---- Button "Bogen abschließen" (PDF-JavaScript: sperrt alle Felder + Unterschriften)
@@ -13885,7 +13981,16 @@ var qrcode = function() {
       st.werte[name] = st.werte[name] === v ? "" : v;
       grp.querySelectorAll("button").forEach(function (x) { x.classList.toggle("an", x.getAttribute("data-v") === st.werte[name]); });
       speichern(); navAktualisieren();
-      if (name === "zugang") verweigertBox();
+      if (name === "zugang") {
+        // niemand angetroffen: vorbelegte Anwesende / Name Besitzer leeren
+        var nm = st.daten.person[0] || "";
+        if (st.werte.zugang === "NA") { if (st.werte.anwesend === nm) st.werte.anwesend = ""; if (st.werte.name_besitzer === nm) st.werte.name_besitzer = ""; }
+        else { if (!st.werte.anwesend) st.werte.anwesend = nm; if (!st.werte.name_besitzer) st.werte.name_besitzer = nm; }
+        var aw = document.querySelector('[data-name="anwesend"]'); if (aw) aw.value = st.werte.anwesend || "";
+        speichern();
+        verweigertBox();
+      }
+      if (name === "frage02" && $("verstossKarte")) { $("verstossKarte").innerHTML = verstossHtml(); alleWachsen(); }
       if (st.schritt === 2) {
         // Hauptwaffe "Ja" -> alle noch offenen Waffenteile dieser Waffe ebenfalls "Ja"
         var card = grp.closest(".card"), box = card && card.querySelector("[data-teilebox]");
@@ -13952,7 +14057,8 @@ var qrcode = function() {
     el.innerHTML = V ? '<b style="color:var(--ok)">✓ Kostenbescheid-Vorlage eingerichtet</b> <span class="muted">(' + esc((V.behoerde || [])[0] || "") + ")</span>"
       : '<b style="color:var(--warn)">Kostenbescheid-Vorlage fehlt</b> <span class="muted">– kommt mit der nächsten Tour vom PC.</span>';
   }
-  function bescheidMoeglich(p) { return !!vorlage() && (p.werte || {}).zugang !== "Nein"; }
+  var SIGS = ["besitzer", "kontrolleur", "besitzer_a1", "kontrolleur_a1"];
+  function bescheidMoeglich(p) { var z = (p.werte || {}).zugang; return !!vorlage() && z !== "Nein" && z !== "NA"; }
   async function bescheidBauen(p, werte) {
     var V = vorlage();
     return WK.kostenbescheid(PDFLib, p.daten, werte || p.werte, V, { wappen: wappenBytes(V) });
@@ -14073,9 +14179,11 @@ var qrcode = function() {
     $("balken").style.width = liste.length ? (100 * fertig / liste.length) + "%" : "0";
     ul.innerHTML = liste.map(function (p, i) {
       var d = p.daten, adr = adresse(d), anz = d.items.filter(function (it) { return it.nr; }).length;
-      var cls = p.fertig ? "fertig" : (p.status === "begonnen" ? "begonnen" : "");
-      var symbol = p.fertig ? "✓" : (p.status === "begonnen" ? "…" : String(i + 1));
-      var zeile3 = p.fertig ? '<div class="zeile2" style="color:var(--ok)"><b style="font-size:14px">' + esc(p.ergebnis.vermerk) + "</b>" +
+      var na = p.fertig && p.ergebnis && p.ergebnis.nichtAngetroffen;
+      var cls = na ? "na" : p.fertig ? "fertig" : (p.status === "begonnen" ? "begonnen" : "");
+      var symbol = na ? "!" : p.fertig ? "✓" : (p.status === "begonnen" ? "…" : String(i + 1));
+      var zeile3 = p.fertig ? '<div class="zeile2" style="color:' + (na ? "#8a6500" : "var(--ok)") + '"><b style="font-size:14px">' + (na ? "Nicht angetroffen · " : "") + esc(p.ergebnis.vermerk) + "</b>" +
+        (p.ergebnis.verstoss ? ' · <span style="color:var(--err)"><b>Verstoß (Anlage 1)</b></span>' : "") +
         (p.ergebnis.nichtVorhanden ? ' · <span style="color:var(--err)">' + p.ergebnis.nichtVorhanden + " nicht vorhanden</span>" : "") + "</div>"
         : (p.status === "begonnen" ? '<div class="zeile2" style="color:var(--warn)">angefangen</div>' : "");
       var akt = p.fertig
@@ -14316,7 +14424,7 @@ var qrcode = function() {
     var personen = [];
     for (var i = 0; i < fertig.length; i++) {
       var p = fertig[i], e = { id: p.id, n: p.daten.person[0] || "", werte: Object.assign({}, p.werte, { abschluss_vermerk: p.ergebnis.vermerk }), vec: {}, rle: {} };
-      for (var k of ["besitzer", "kontrolleur"]) {
+      for (var k of SIGS) {
         if (p.sigVec && p.sigVec[k] && p.sigVec[k].ok !== false && p.sigVec[k].s.length && p.sig[k]) e.vec[k] = vereinfachen(p.sigVec[k]);
         else if (p.sig && p.sig[k]) e.rle[k] = await bildRLE(p.sig[k]);
       }
@@ -14338,17 +14446,17 @@ var qrcode = function() {
         var p = liste.filter(function (x) { return x.id === e.id; })[0];
         if (!p) throw new Error("nicht in der Kontrollliste dieses PCs – bitte das Stammdatenblatt erst laden und dann nochmal scannen");
         var sigUrl = {}, sigBytes = {};
-        ["besitzer", "kontrolleur"].forEach(function (k) {
+        SIGS.forEach(function (k) {
           if (e.vec && e.vec[k]) sigUrl[k] = sigVecBild(e.vec[k]); else if (e.rle && e.rle[k]) sigUrl[k] = rleBild(e.rle[k]);
           if (sigUrl[k]) sigBytes[k] = unb64(sigUrl[k].split(",")[1]);
         });
-        var vw = e.werte.zugang === "Nein";
+        var vw = e.werte.zugang === "Nein" || e.werte.zugang === "NA";
         var fehlend = vw ? 0 : p.daten.items.filter(function (it, j) { return e.werte["pos" + pos(j) + "_vorhanden"] === "Nein"; }).length;
         var r = await WK.abschliessen(PDFLib, p.daten, null, e.werte, sigBytes, { anlage: false, logo: logoBytes() });
         p.werte = e.werte; p.bescheid = null; p.bescheidName = null;
         if (bescheidMoeglich(p)) { var kb = await bescheidBauen(p, e.werte); p.bescheid = kb.bytes; p.bescheidName = kb.name; }
         p.sig = sigUrl; p.fertig = true; p.status = "fertig"; p.pdf = r.bytes; p.schritt = 6;
-        p.ergebnis = { name: r.name, hash: r.hash, vermerk: e.werte.abschluss_vermerk, nichtVorhanden: fehlend, verweigert: vw, vomIpad: true };
+        p.ergebnis = { name: r.name, hash: r.hash, vermerk: e.werte.abschluss_vermerk, nichtVorhanden: fehlend, verweigert: vw, nichtAngetroffen: e.werte.zugang === "NA", verstoss: e.werte.frage02 === "Ja", vomIpad: true };
         await dbPut(p); ok.push(name);
       } catch (err) { console.error(err); fehler.push(name + ": " + (err.message || err)); }
     }
@@ -14408,7 +14516,7 @@ var qrcode = function() {
     var d = st.daten, w = st.werte, o = { start: 0, waffen: 0, munition: 0, fragen: 0, sig: 0 };
     WK.FRAGEN_START.forEach(function (f) { if (!w[f[0]]) o.start++; });
     if (!w.zugang) o.start++;
-    if (w.zugang === "Nein") { if (!st.sig.kontrolleur) o.sig++; return o; }
+    if (w.zugang === "Nein" || w.zugang === "NA") { if (w.zugang === "Nein" && !w.frage02) o.fragen++; if (!st.sig.kontrolleur) o.sig++; return o; }
     d.items.forEach(function (it, i) { if (!w["pos" + pos(i) + "_vorhanden"]) o.waffen++; });
     var kl = WK.kaliberListe(d);
     kl.kaliber.forEach(function (k, i) { if (!w["mun" + pos(i) + "_vorhanden"]) o.munition++; });
@@ -14497,22 +14605,50 @@ var qrcode = function() {
       '<div class="card"><h3>Kontrolle</h3>' +
       '<div class="zeile"><div class="was">Kontrolle wurde …</div><span class="jn" data-name="zugang">' +
       '<button type="button" class="ja' + (st.werte.zugang === "Ja" ? " an" : "") + '" data-v="Ja" style="width:110px">gestattet</button>' +
-      '<button type="button" class="nein' + (st.werte.zugang === "Nein" ? " an" : "") + '" data-v="Nein" style="width:110px">verweigert</button></span></div>' +
+      '<button type="button" class="nein' + (st.werte.zugang === "Nein" ? " an" : "") + '" data-v="Nein" style="width:110px">verweigert</button>' +
+      '<button type="button" class="na' + (st.werte.zugang === "NA" ? " an" : "") + '" data-v="NA" style="width:150px">nicht angetroffen</button></span></div>' +
       '<div id="verweigertBox"></div>' +
       WK.FRAGEN_START.map(function (f) { return '<div class="zeile"><div class="was">' + esc(f[1]) + '</div>' + jnHtml(f[0]) + '</div>'; }).join("") +
       '</div>';
     verweigertBox();
   }
-  function verweigert() { return !!st && st.werte.zugang === "Nein"; }
+  // keine Prüfung möglich: verweigert oder niemand angetroffen
+  function verweigert() { return !!st && (st.werte.zugang === "Nein" || st.werte.zugang === "NA"); }
+  function nichtAngetroffen() { return !!st && st.werte.zugang === "NA"; }
+  // Anlage 1: Dokumentation eines Verstoßes (nur sichtbar bei "Verstoß festgestellt" = Ja)
+  function verstossHtml() {
+    var w = st.werte;
+    var html = '<div class="zeile"><div class="was"><b>Verstoß festgestellt?</b><span class="muted klein">Bei „Ja“ wird Anlage 1 (Dokumentation) ausgefüllt und dem Protokoll angehängt.</span></div>' + jnHtml("frage02") + '</div>';
+    if (w.frage02 !== "Ja") return html;
+    return html + '<div class="verstoss" style="border-top:1px solid var(--line);padding-top:12px">' +
+      '<div class="muted klein" style="margin-bottom:8px">Art des Verstoßes</div><div class="chips blau">' +
+      [["vs_straftat", "Straftat"], ["vs_owi", "Ordnungswidrigkeit"]].map(function (c) { return '<button type="button" class="chip' + (w[c[0]] === "X" ? " an" : "") + '" data-chip="' + c[0] + '">' + c[1] + "</button>"; }).join("") + '</div>' +
+      '<div style="margin-top:12px">' + inputHtml("vs_sachverhalt", "Sachverhaltsdarstellung", { textarea: true }) + '</div>' +
+      '<div style="margin-top:10px">' + inputHtml("vs_zeugen", "Zeuge/n – Name und Funktion") + '</div>' +
+      '<div class="muted klein" style="margin:12px 0 8px">Maßnahmen</div><div class="chips blau">' +
+      [["vs_widerruf", "Einleitung Widerrufsverfahren"], ["vs_bussgeld", "Einleitung Bußgeldverfahren"]].map(function (c) { return '<button type="button" class="chip' + (w[c[0]] === "X" ? " an" : "") + '" data-chip="' + c[0] + '">' + c[1] + "</button>"; }).join("") + '</div>' +
+      '<div style="margin-top:10px">' + inputHtml("vs_sonstiges", "Sonstiges") + '</div>' +
+      '<div class="zeile" style="margin-top:8px"><div class="was">Betroffene/r: Ich gebe den Verstoß zu</div>' + jnHtml("vs_zugegeben") + '</div>' +
+      '<div>' + inputHtml("vs_erklaerung", "wenn Nein, Erklärung", { textarea: true }) + '</div>' +
+      '<div style="margin-top:10px">' + inputHtml("vs_bemerkungen", "Bemerkungen", { textarea: true }) + '</div>' +
+      '<p class="muted klein" style="margin:10px 0 0">Unterschriften für Anlage 1 kommen im letzten Schritt.</p></div>';
+  }
   function verweigertBox() {
     var b = $("verweigertBox"); if (!b) return;
     if (!verweigert()) { b.innerHTML = ""; return; }
+    if (nichtAngetroffen()) {
+      b.innerHTML = '<div style="padding:4px 0 12px">' + inputHtml("bemerkungen", "Bemerkungen (z. B. Benachrichtigung hinterlassen)", { textarea: true }) +
+        '<div class="hinweisbox gelb" style="margin:12px 0 0"><b>Niemand angetroffen:</b> Die Schritte Waffen, Munition und Aufbewahrung entfallen. ' +
+        'Mit „Weiter“ geht es direkt zur Übersicht. Es unterschreibt nur die/der Kontrollierende, ein Kostenbescheid entsteht nicht.</div></div>';
+      alleWachsen(); return;
+    }
     b.innerHTML = '<div style="padding:4px 0 12px"><div class="muted klein" style="margin-bottom:8px">wegen</div><div class="chips">' +
       WK.GRUENDE.map(function (g) { return '<button type="button" class="chip' + (st.werte[g[0]] === "X" ? " an" : "") + '" data-chip="' + g[0] + '">' + esc(g[1]) + '</button>'; }).join("") +
       '</div><div style="margin-top:10px">' + inputHtml("grund_sonstig", "sonstiger Grund (bitte benennen)") + '</div>' +
       '<div style="margin-top:10px">' + inputHtml("bemerkungen", "Bemerkungen", { textarea: true }) + '</div>' +
       '<div class="hinweisbox err" style="margin:12px 0 0"><b>Kontrolle verweigert:</b> Die Schritte Waffen, Munition und Aufbewahrung entfallen. ' +
-      'Mit „Weiter“ geht es direkt zu den Unterschriften.</div></div>';
+      'Mit „Weiter“ geht es direkt zu den Unterschriften.</div>' +
+      '<div class="card" id="verstossKarte" style="margin:12px 0 0">' + verstossHtml() + '</div></div>';
     alleWachsen();
   }
 
@@ -14630,12 +14766,14 @@ var qrcode = function() {
   function schritt4(el) {
     var html = '<h2>Aufbewahrung</h2><div class="card">';
     WK.FRAGEN.forEach(function (f, i) {
-      html += '<div class="zeile"><div class="was">' + (i + 1) + ". " + esc(f) + '</div>' + jnHtml("frage" + pos(i)) + '</div>';
+      if (i === 1) return; // Verstoß: eigene Karte unten
+      html += '<div class="zeile"><div class="was">' + esc(f) + '</div>' + jnHtml("frage" + pos(i)) + '</div>';
     });
     html += '</div><div class="card"><div class="grid">' +
       inputHtml("behaeltnis", "Aufbewahrungsbehältnis (Hersteller, Typ)") +
       inputHtml("widerstandsgrad", "Widerstandsgrad / Norm") +
-      '</div><div style="margin-top:12px">' + inputHtml("bemerkungen", "Bemerkungen / festgestellte Mängel / Auflagen", { textarea: true }) + '</div></div>';
+      '</div><div style="margin-top:12px">' + inputHtml("bemerkungen", "Bemerkungen / festgestellte Mängel / Auflagen", { textarea: true }) + '</div></div>' +
+      '<div class="card" id="verstossKarte">' + verstossHtml() + '</div>';
     el.innerHTML = html;
     alleWachsen();
   }
@@ -14649,6 +14787,7 @@ var qrcode = function() {
     if (o.fragen) p.push(o.fragen + " Frage(n) zur Aufbewahrung offen (Schritt 4)");
     if (!ohneSig) {
       if (!st.sig.besitzer && !vw) p.push("Unterschrift Waffenbesitzer/in fehlt");
+      if (st.werte.frage02 === "Ja" && !st.sig.kontrolleur_a1) p.push("Unterschrift Waffenbehörde auf Anlage 1 fehlt");
       if (!st.sig.kontrolleur) p.push("Unterschrift Kontrollierende/r fehlt");
       if (bescheidMoeglich(st) && !st.werte.anrede) p.push("Anrede (Herr/Frau) für den Kostenbescheid fehlt");
     }
@@ -14666,7 +14805,9 @@ var qrcode = function() {
     var pr = probleme(true), fehlend = fehlendeTeile(), vw = verweigert();
     el.innerHTML = '<h2>Übersicht</h2>' +
       '<p>Bitte der Waffenbesitzerin / dem Waffenbesitzer zeigen. <b>Leere Felder sind durchgestrichen</b> und können nach der Unterschrift nicht mehr ergänzt werden.</p>' +
-      (vw ? '<div class="hinweisbox err"><b>Kontrolle verweigert.</b> Waffen, Munition und Aufbewahrung wurden nicht geprüft.</div>' : "") +
+      (vw ? (nichtAngetroffen() ? '<div class="hinweisbox gelb"><b>Niemand angetroffen.</b> Die Kontrolle wurde nicht durchgeführt.</div>'
+        : '<div class="hinweisbox err"><b>Kontrolle verweigert.</b> Waffen, Munition und Aufbewahrung wurden nicht geprüft.</div>') : "") +
+      (st.werte.frage02 === "Ja" ? '<div class="hinweisbox err"><b>Verstoß festgestellt</b> – Anlage 1 ist im Protokoll angehängt.</div>' : "") +
       (pr.length ? '<div class="hinweisbox warn"><b>Noch offen (wird durchgestrichen):</b><ul>' + pr.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + '</ul></div>'
         : '<div class="hinweisbox ok"><b>Alles ausgefüllt.</b></div>') +
       (fehlend.length ? '<div class="hinweisbox err"><b>Als NICHT vorhanden markiert:</b><ul>' +
@@ -14699,12 +14840,14 @@ var qrcode = function() {
     var vw = verweigert();
     el.innerHTML = '<h2>Unterschriften</h2>' +
       '<p>' + (vw ? "Die obigen Angaben sind zutreffend." : "Die Kontrolle wurde in meinem Beisein durchgeführt. Die Angaben sind zutreffend.") + '</p>' +
-      [["besitzer", "Waffenbesitzer/in" + (vw ? " (freiwillig)" : "")], ["kontrolleur", "Kontrollierende/r · Sachbearbeiter Waffen & Sprengstoff"]].map(function (r) {
+      [["besitzer", "Waffenbesitzer/in" + (vw ? " (freiwillig)" : "")], ["kontrolleur", "Kontrollierende/r · Sachbearbeiter Waffen & Sprengstoff"]]
+        .concat(st.werte.frage02 === "Ja" ? [["kontrolleur_a1", "Anlage 1 (Verstoß) · Waffenbehörde"], ["besitzer_a1", "Anlage 1 (Verstoß) · Waffenbesitzer/in"]] : [])
+        .filter(function (r) { return !(r[0] === "besitzer" && nichtAngetroffen()); }).map(function (r) {
         return '<div class="card"><h3>Unterschrift ' + esc(r[1]) + '</h3>' +
           '<div class="sigvorschau" data-sign="' + r[0] + '">' + (st.sig[r[0]] ? '<img src="' + st.sig[r[0]] + '" alt="Unterschrift">' : '<span>✍️ Zum Unterschreiben antippen</span>') + '</div>' +
           '<div class="sigaktion"><span class="muted klein">' + (st.sig[r[0]] ? "✓ unterschrieben" : "") + '</span>' +
           (st.sig[r[0]] ? '<button class="btn sec klein" type="button" data-sigweg="' + r[0] + '">Löschen</button>' : "") + '</div>' +
-          inputHtml("name_" + r[0], "Name in Druckbuchstaben") + '</div>';
+          (/_a1$/.test(r[0]) ? "" : inputHtml("name_" + r[0], "Name in Druckbuchstaben")) + '</div>';
       }).join("") +
       bescheidKarte() +
       '<div class="card">' +
@@ -14742,12 +14885,12 @@ var qrcode = function() {
           abschluss_vermerk: "Abgeschlossen am " + jetzt.toLocaleDateString("de-DE") + ", " + zwei(jetzt.getHours()) + ":" + zwei(jetzt.getMinutes()) + " Uhr",
         });
         var sig = {};
-        ["besitzer", "kontrolleur"].forEach(function (k) { if (st.sig[k]) sig[k] = unb64(st.sig[k].split(",")[1]); });
+        SIGS.forEach(function (k) { if (st.sig[k]) sig[k] = unb64(st.sig[k].split(",")[1]); });
         var r = await WK.abschliessen(PDFLib, st.daten, null, werte, sig, { anlage: false, logo: logoBytes() });
         if (bescheidMoeglich(st)) { var kb = await bescheidBauen(st, werte); st.bescheid = kb.bytes; st.bescheidName = kb.name; }
         else { st.bescheid = null; st.bescheidName = null; }
         st.fertig = true; st.status = "fertig"; st.pdf = r.bytes;
-        st.ergebnis = { name: r.name, hash: r.hash, vermerk: werte.abschluss_vermerk, nichtVorhanden: fehlend.length, verweigert: verweigert() };
+        st.ergebnis = { name: r.name, hash: r.hash, vermerk: werte.abschluss_vermerk, nichtVorhanden: fehlend.length, verweigert: verweigert(), nichtAngetroffen: nichtAngetroffen(), verstoss: st.werte.frage02 === "Ja" };
         clearTimeout(speicherTimer); await dbPut(st);
         zeigeSchritt(6);
       } catch (e) {
@@ -14759,7 +14902,8 @@ var qrcode = function() {
 
   // Vollbild-Unterschrift: ganze Seite zum Unterschreiben (iPad quer), Ergebnis wird auf die Schrift zugeschnitten
   function unterschriftVollbild(wer, fertigFn) {
-    var titel = wer === "besitzer" ? "Unterschrift Waffenbesitzer/in" : "Unterschrift Kontrollierende/r";
+    var titel = { besitzer: "Unterschrift Waffenbesitzer/in", kontrolleur: "Unterschrift Kontrollierende/r",
+      besitzer_a1: "Anlage 1 (Verstoß) – Unterschrift Waffenbesitzer/in", kontrolleur_a1: "Anlage 1 (Verstoß) – Unterschrift Waffenbehörde" }[wer];
     var wz = ((st.daten.behoerde || "") + "  ·  DOK-NR. " + (st.daten.dok_nr || "") + "  ·  ").toUpperCase();
     var ov = document.createElement("div"); ov.className = "sig-ov";
     ov.innerHTML = '<div class="sig-kopf"><b>' + esc(titel) + '</b><span class="hoch muted">Tipp: iPad quer drehen</span>' +
@@ -14841,7 +14985,7 @@ var qrcode = function() {
   }
 
   function bescheidKarte() {
-    if (verweigert()) return '<div class="card"><h3>Kostenbescheid</h3><p class="muted klein" style="margin:0">Bei verweigerter Kontrolle wird kein Kostenbescheid erstellt.</p></div>';
+    if (verweigert()) return '<div class="card"><h3>Kostenbescheid</h3><p class="muted klein" style="margin:0">' + (nichtAngetroffen() ? "Niemand angetroffen" : "Kontrolle verweigert") + ' – es wird kein Kostenbescheid erstellt.</p></div>';
     var V = vorlage();
     if (!V) return '<div class="card"><h3>Kostenbescheid</h3><p class="hinweisbox warn" style="margin:0">Keine Kostenbescheid-Vorlage auf diesem Gerät. Sie kommt mit der nächsten Tour vom PC; ' +
       'der Kostenbescheid entsteht dann auch beim Zurückübertragen am PC.</p></div>';
@@ -14865,7 +15009,7 @@ var qrcode = function() {
       '<button class="btn" type="button" id="ansehen">Protokoll ansehen</button>' +
       (p.bescheid ? '<button class="btn sec" type="button" id="bescheidAnsehen">Kostenbescheid ansehen</button>' : "") +
       '<button class="btn sec" type="button" id="beidesDrucken">🖨 ' + (p.bescheid ? "Beides drucken" : "Drucken") + '</button></div>' +
-      (p.bescheid ? "" : '<p class="muted klein">' + (r.verweigert ? "Kontrolle verweigert – kein Kostenbescheid." : "Kein Kostenbescheid (Vorlage fehlt auf diesem Gerät) – er entsteht beim Zurückübertragen am PC.") + "</p>") +
+      (p.bescheid ? "" : '<p class="muted klein">' + (r.nichtAngetroffen ? "Niemand angetroffen – kein Kostenbescheid." : r.verweigert ? "Kontrolle verweigert – kein Kostenbescheid." : "Kein Kostenbescheid (Vorlage fehlt auf diesem Gerät) – er entsteht beim Zurückübertragen am PC.") + "</p>") +
       '<p class="muted klein">' + (iOS ? "Zum PC kommen Protokoll und Kostenbescheid über „Ergebnisse an PC übertragen (QR)“ in der Kontrollliste." :
         "Beides bleibt in der Kontrollliste gespeichert, bis du die Person entfernst oder die Liste leerst.") + '</p>' +
       '<button class="btn gruen" type="button" id="zurListe">Zurück zur Übersicht</button></div>';
