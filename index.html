@@ -83,6 +83,15 @@
   .sigvorschau { border:2px dashed #9fb3cc; border-radius:10px; background:#f7f9fc; min-height:110px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; color:var(--accent); font-weight:600; }
   .sigvorschau img { max-width:100%; max-height:160px; display:block; }
   .vorschau canvas { width:100%; display:block; margin:0 0 12px; border:1px solid var(--line); border-radius:6px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  #druck { display:none; }
+  @page { size:A4; margin:0; }
+  @media print {
+    body > *:not(#druck) { display:none !important; }
+    html, body { background:#fff !important; margin:0; padding:0; }
+    #druck { display:block !important; }
+    #druck img { display:block; width:210mm; height:297mm; object-fit:contain; page-break-after:always; break-after:page; }
+    #druck img:last-child { page-break-after:auto; break-after:auto; }
+  }
   .pdf-ov { position:fixed; inset:0; z-index:65; background:#e9edf2; display:flex; flex-direction:column; }
   .pdf-ov .kopf { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px 14px; background:#fff; border-bottom:1px solid var(--line); }
   .pdf-ov .seiten { flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:14px; }
@@ -194,9 +203,8 @@
           <button class="btn klein" type="button" id="qrZeigen">Tour als QR-Code anzeigen</button>
           <button class="btn klein" type="button" id="ergebnisScan">📷 Ergebnisse vom iPad empfangen</button>
           <button class="btn gruen klein" type="button" id="ergebnisZeigen">📤 Ergebnisse an PC übertragen (QR)</button>
-          <button class="btn sec klein" type="button" id="tourExport">Tour als Datei exportieren</button>
-          <button class="btn sec klein" type="button" id="alleLaden">Alle fertigen PDFs herunterladen</button>
           <button class="btn sec klein" type="button" id="listeLeeren">Liste leeren</button>
+          <button class="btn sec klein" type="button" id="vorlageSenden">Kostenbescheid-Vorlage ans iPad senden (QR)</button>
         </div>
       </div>
 
@@ -13794,10 +13802,34 @@ var qrcode = function() {
     var V = vorlage();
     return WK.kostenbescheid(PDFLib, p.daten, werte || p.werte, V, { wappen: wappenBytes(V) });
   }
+  // Drucken: Seiten als Bilder in einen Druckbereich legen und den Druckdialog öffnen (klappt am PC und per AirPrint am iPad)
+  async function drucken(liste) {
+    var box = $("druck");
+    if (!box) { box = document.createElement("div"); box.id = "druck"; document.body.appendChild(box); }
+    box.innerHTML = "";
+    meldung($("startMeldung"), "ok", "Druck wird vorbereitet …");
+    try {
+      for (var k = 0; k < liste.length; k++) {
+        var doc = await pdfjs.getDocument({ data: liste[k].slice(0), isEvalSupported: false }).promise;
+        for (var i = 1; i <= doc.numPages; i++) {
+          var pg = await doc.getPage(i), vp = pg.getViewport({ scale: 2.5 });
+          var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+          var ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+          await pg.render({ canvasContext: ctx, viewport: vp, intent: "print" }).promise;
+          var img = document.createElement("img"); img.src = c.toDataURL("image/png"); box.appendChild(img);
+        }
+        await doc.destroy();
+      }
+      await Promise.all(Array.prototype.map.call(box.querySelectorAll("img"), function (im) { return im.decode ? im.decode().catch(function () {}) : null; }));
+      meldung($("startMeldung"), "", "");
+      window.print();
+    } catch (e) { meldung($("startMeldung"), "err", "Drucken nicht möglich: " + esc(e.message || e)); }
+  }
   // PDF im Vollbild anzeigen (bleibt in der App)
   async function pdfAnzeigen(bytes, titel, dateiname) {
     var ov = document.createElement("div"); ov.className = "pdf-ov";
     ov.innerHTML = '<div class="kopf"><b>' + esc(titel) + '</b><span class="route">' +
+      '<button class="btn sec klein" type="button" data-p="drucken">🖨 Drucken</button>' +
       (iOS ? "" : '<button class="btn sec klein" type="button" data-p="laden">Herunterladen</button>') +
       '<button class="btn klein" type="button" data-p="zu">Schließen</button></span></div><div class="seiten"><p class="muted">Wird geladen …</p></div>';
     document.body.appendChild(ov); document.documentElement.style.overflow = "hidden";
@@ -13805,6 +13837,7 @@ var qrcode = function() {
       var a = e.target.getAttribute && e.target.getAttribute("data-p");
       if (a === "zu") { ov.remove(); document.documentElement.style.overflow = ""; }
       if (a === "laden") herunterladen(bytes, dateiname);
+      if (a === "drucken") drucken([bytes]);
     });
     try {
       var doc = await pdfjs.getDocument({ data: bytes.slice(0), isEvalSupported: false }).promise, box = ov.querySelector(".seiten");
@@ -13823,7 +13856,7 @@ var qrcode = function() {
   var ordner = $("ordner"), iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   if (iOS || !("webkitdirectory" in ordner)) $("ordnerBtn").classList.add("versteckt");
   else $("qrScan").classList.add("versteckt");
-  if (iOS) $("ergebnisScan").classList.add("versteckt");
+  if (iOS) { $("ergebnisScan").classList.add("versteckt"); $("vorlageSenden").classList.add("versteckt"); }
   $("ordnerBtn").onclick = function () { ordner.click(); };
   ordner.addEventListener("change", function () {
     var f = Array.prototype.slice.call(ordner.files).filter(function (x) { return /\.pdf$/i.test(x.name); });
@@ -13880,7 +13913,7 @@ var qrcode = function() {
     var ul = $("personen"), fertig = liste.filter(function (p) { return p.fertig; }).length;
     $("listeLeer").classList.toggle("versteckt", liste.length > 0);
     $("listeAktionen").classList.toggle("versteckt", liste.length === 0);
-    $("ergebnisZeigen").classList.toggle("versteckt", !liste.some(function (p) { return p.fertig; }));
+    $("ergebnisZeigen").classList.toggle("versteckt", !iOS || !liste.some(function (p) { return p.fertig; }));
     $("zaehler").textContent = liste.length ? fertig + " von " + liste.length + " kontrolliert" : "";
     $("balken").style.width = liste.length ? (100 * fertig / liste.length) + "%" : "0";
     ul.innerHTML = liste.map(function (p, i) {
@@ -13892,7 +13925,8 @@ var qrcode = function() {
         : (p.status === "begonnen" ? '<div class="zeile2" style="color:var(--warn)">angefangen</div>' : "");
       var akt = p.fertig
         ? '<button class="btn gruen klein" data-akt="pdf" data-i="' + i + '">Protokoll</button>' +
-          (p.bescheid ? '<button class="btn sec klein" data-akt="bescheid" data-i="' + i + '">Kostenbescheid</button>' : "")
+          (p.bescheid ? '<button class="btn sec klein" data-akt="bescheid" data-i="' + i + '">Kostenbescheid</button>' : "") +
+          '<button class="btn sec klein" data-akt="drucken" data-i="' + i + '">🖨 Drucken</button>'
         : routeLinks(adr, true) + '<button class="btn klein" data-akt="start" data-i="' + i + '">' + (p.status === "begonnen" ? "Fortsetzen" : "Kontrolle starten") + "</button>";
       return '<li class="person ' + cls + '"><div class="status">' + symbol + '</div>' +
         '<div class="info"><b>' + esc(d.person[0] || "") + '</b><div class="zeile2">' + esc(adr) + "</div>" +
@@ -13906,6 +13940,7 @@ var qrcode = function() {
     var p = liste[+b.getAttribute("data-i")], akt = b.getAttribute("data-akt");
     if (akt === "start") kontrolleOeffnen(p);
     else if (akt === "pdf") pdfAnzeigen(p.pdf, "Protokoll – " + (p.daten.person[0] || ""), p.ergebnis.name);
+    else if (akt === "drucken") drucken(p.bescheid ? [p.pdf, p.bescheid] : [p.pdf]);
     else if (akt === "bescheid") pdfAnzeigen(p.bescheid, "Kostenbescheid – " + (p.daten.person[0] || ""), p.bescheidName || "Kostenbescheid.pdf");
     else if (akt === "weg") {
       var was = p.fertig ? "abgeschlossene Kontrolle (das PDF wird hier gelöscht – vorher gesichert?)" : "Person";
@@ -13919,42 +13954,8 @@ var qrcode = function() {
     if (!(await frage("Ganze Liste leeren?" + (offen ? " " + offen + " Kontrolle(n) sind noch nicht abgeschlossen." : "") + " Fertige PDFs vorher sichern!", "Leeren", true))) return;
     liste.forEach(function (p) { dbDel(p.id); }); liste = []; listeZeigen(); meldung($("startMeldung"), "", "");
   };
-  $("alleLaden").onclick = function () {
-    var f = liste.filter(function (p) { return p.fertig && p.pdf; });
-    if (!f.length) { hinweis("Noch keine abgeschlossenen Kontrollen."); return; }
-    var dl = [];
-    f.forEach(function (p) { dl.push([p.pdf, p.ergebnis.name]); if (p.bescheid) dl.push([p.bescheid, p.bescheidName || "Kostenbescheid.pdf"]); });
-    dl.forEach(function (x, i) { setTimeout(function () { herunterladen(x[0], x[1]); }, i * 400); });
-  };
-
-  // ---------- Tour exportieren / importieren
   function b64(bytes) { var s = "", c = 0x8000; for (var i = 0; i < bytes.length; i += c) s += String.fromCharCode.apply(null, bytes.subarray(i, i + c)); return btoa(s); }
-  $("tourExport").onclick = function () {
-    var offen = liste.filter(function (p) { return !p.fertig; });
-    if (!offen.length) { hinweis("Keine offenen Kontrollen in der Liste."); return; }
-    var jetzt = new Date();
-    var tour = { tourId: "tour-" + jetzt.getTime(), erstellt: jetzt.toISOString(), kontrolleur: meinName.value.trim(),
-      begleiter: begleiterIn.value.trim(), logo: lsGet("wk_logo") || null, bescheid: vorlage(),
-      personen: offen.map(function (p) {
-        return { id: p.id, daten: p.daten, original: p.original ? b64(p.original) : null, dateiname: p.dateiname, werte: p.werte, sig: p.sig || {},
-          schritt: p.schritt || 1, status: p.status, reihenfolge: p.reihenfolge };
-      }) };
-    var klon = document.documentElement.cloneNode(true);
-    ["s-1", "s-2", "s-3", "s-4", "s-5", "s-6", "personen", "wListe", "startMeldung", "nav", "wer"].forEach(function (id) {
-      var el = klon.querySelector("#" + id); if (el) el.innerHTML = "";
-    });
-    var alt = klon.querySelector("#tourdaten"); if (alt) alt.remove();
-    var sc = document.createElement("script");
-    sc.type = "application/json"; sc.id = "tourdaten";
-    sc.textContent = JSON.stringify(tour).replace(/<\/script/g, "<\\/script");
-    klon.querySelector("body").insertBefore(sc, klon.querySelector("body").firstChild);
-    var html = "<!doctype html>\n" + klon.outerHTML;
-    var name = "Tour_" + jetzt.getFullYear() + "-" + zwei(jetzt.getMonth() + 1) + "-" + zwei(jetzt.getDate()) + "_" + offen.length + "_Personen.html";
-    var url = URL.createObjectURL(new Blob([html], { type: "text/html" })), a = document.createElement("a");
-    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
-    meldung($("startMeldung"), "ok", "Tour-Datei <b>" + esc(name) + "</b> mit " + offen.length + " Person(en) wurde gespeichert. Diese eine Datei aufs Tablet schicken.");
-  };
+
   // ---------- QR-Übertragung (offline). Hin: PC -> iPad (Tour). Zurück: iPad -> PC (Ergebnisse).
   var QR_TEIL = 450;
   async function packen(obj) {
@@ -14057,10 +14058,27 @@ var qrcode = function() {
     if (!offen.length) { hinweis("Keine offenen Kontrollen in der Liste."); return; }
     var jetzt = new Date();
     var tour = { tourId: "tour-" + jetzt.getTime(), erstellt: jetzt.toISOString(), kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim(), qr: true,
-      bescheid: (function () { var V = vorlage(); if (!V) return null; V = Object.assign({}, V); delete V.wappen; return V; })(),
+      bescheid: vorlageFuerQr(false),
       personen: offen.map(function (p) { return { id: p.id, daten: p.daten, werte: p.werte, reihenfolge: p.reihenfolge }; }) };
     qrAnzeigen("WKQ1", tour, "Tour mit " + offen.length + " Person(en) – auf dem iPad „Tour per QR-Code scannen“ antippen und hierauf richten",
-      "Die Codes wechseln automatisch. Das Stammdatenblatt selbst bleibt am PC (es wird beim Zurückübertragen wieder angehängt).");
+      "Die Codes wechseln automatisch. Das Stammdatenblatt selbst bleibt am PC." + (tour.bescheid ? " Diesmal ist die Kostenbescheid-Vorlage mit dabei (nur beim ersten Mal bzw. nach Änderungen)." : ""), 1200);
+  };
+  // Vorlage nur mitschicken, wenn sie noch nicht (in dieser Fassung) ans iPad ging – spart viele Codes
+  function vorlageFuerQr(immer) {
+    var V = vorlage(); if (!V) return null;
+    V = Object.assign({}, V); delete V.wappen;
+    var j = JSON.stringify(V), h = j.length + ":" + WK.sha256js(new TextEncoder().encode(j)).slice(0, 16);
+    if (!immer && lsGet("wk_vorlage_qr") === h) return null;
+    lsSet("wk_vorlage_qr", h);
+    return V;
+  }
+  $("vorlageSenden").onclick = function () {
+    var V = vorlageFuerQr(true);
+    if (!V) { hinweis("Auf diesem Gerät ist keine Kostenbescheid-Vorlage eingerichtet."); return; }
+    var jetzt = new Date();
+    qrAnzeigen("WKQ1", { tourId: "vorlage-" + jetzt.getTime(), erstellt: jetzt.toISOString(), qr: true, bescheid: V, personen: [] },
+      "Kostenbescheid-Vorlage – auf dem iPad „Tour per QR-Code scannen“ antippen und hierauf richten",
+      "Nur nötig, wenn das iPad die Vorlage verloren hat (z. B. nach Neuinstallation). Sonst geht sie automatisch mit der Tour mit.", 1200);
   };
   $("qrScan").onclick = function () {
     qrScannen("WKQ1", "Kamera auf die QR-Codes am PC richten", function (tour) { return tourImport(tour, true); });
@@ -14171,7 +14189,7 @@ var qrcode = function() {
     }
     listeZeigen();
     meldung(m, fehler.length ? "warn" : "ok", ok.length + " Protokoll(e) vom iPad übernommen" + (ok.length ? ": " + esc(ok.join(", ")) : "") +
-      " (Protokoll und Kostenbescheid). Mit „Alle fertigen PDFs herunterladen“ speichern." + (fehler.length ? "<br><b>Fehler:</b> " + esc(fehler.join("; ")) : ""));
+      " (Protokoll und Kostenbescheid). Zum Ansehen oder Drucken bei der Person auf die Knöpfe tippen." + (fehler.length ? "<br><b>Fehler:</b> " + esc(fehler.join("; ")) : ""));
   }
 
   async function tourImport(tour, manuell) {
@@ -14680,12 +14698,14 @@ var qrcode = function() {
       '<br><span class="klein" style="word-break:break-all">Prüfsumme (SHA-256): ' + esc(r.hash) + '</span></div>' +
       '<div class="card"><div class="route">' +
       '<button class="btn" type="button" id="ansehen">Protokoll ansehen</button>' +
-      (p.bescheid ? '<button class="btn sec" type="button" id="bescheidAnsehen">Kostenbescheid ansehen</button>' : "") + '</div>' +
+      (p.bescheid ? '<button class="btn sec" type="button" id="bescheidAnsehen">Kostenbescheid ansehen</button>' : "") +
+      '<button class="btn sec" type="button" id="beidesDrucken">🖨 ' + (p.bescheid ? "Beides drucken" : "Drucken") + '</button></div>' +
       (p.bescheid ? "" : '<p class="muted klein">' + (r.verweigert ? "Kontrolle verweigert – kein Kostenbescheid." : "Kein Kostenbescheid (Vorlage fehlt auf diesem Gerät) – er entsteht beim Zurückübertragen am PC.") + "</p>") +
       '<p class="muted klein">' + (iOS ? "Zum PC kommen Protokoll und Kostenbescheid über „Ergebnisse an PC übertragen (QR)“ in der Kontrollliste." :
         "Beides bleibt in der Kontrollliste gespeichert, bis du die Person entfernst oder die Liste leerst.") + '</p>' +
       '<button class="btn gruen" type="button" id="zurListe">Zurück zur Übersicht</button></div>';
     $("ansehen").onclick = function () { pdfAnzeigen(p.pdf, "Protokoll", r.name); };
+    $("beidesDrucken").onclick = function () { drucken(p.bescheid ? [p.pdf, p.bescheid] : [p.pdf]); };
     if (p.bescheid) $("bescheidAnsehen").onclick = function () { pdfAnzeigen(p.bescheid, "Kostenbescheid", p.bescheidName); };
     $("zurListe").onclick = startZeigen;
   }
