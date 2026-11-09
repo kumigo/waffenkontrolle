@@ -12833,6 +12833,158 @@ var qrcode = function() {
     return d;
   }
 
+
+  // ------------------------------------------------------------------ lesen: NWR-Auszug "Personendaten" (Sachbearbeiter-Ansicht, quer)
+  function istPersonendaten(seiten) {
+    return seiten.length > 0 && seiten[0].words.some(function (w) { return w.text === "Personendaten"; }) &&
+      seiten.some(function (s) { return s.words.some(function (w) { return w.text.indexOf("Dokument Nr.:") === 0; }); });
+  }
+  function personendatenAuswerten(seiten) {
+    var d = { person: [], items: [], format: "personendaten", behaeltnisse: [] };
+    // --- Seite 1: Person
+    var w1 = seiten[0].words;
+    var lab = w1.filter(function (w) { return w.x0 < 90 && /:$/.test(w.text); }).sort(function (a, b) { return a.top - b.top; });
+    function wert(label) {
+      var l = lab.filter(function (w) { return w.text === label; })[0]; if (!l) return [];
+      var nxt = lab.filter(function (w) { return w.top > l.top + 3; })[0], bis = nxt ? nxt.top - 3 : l.top + 40;
+      var zz = zeilen(w1.filter(function (w) { return w.x0 >= 100 && w.x0 < 340 && w.top >= l.top - 3 && w.top < bis; })), out = [], last = null;
+      var stop = false;
+      zz.forEach(function (z) { if (!stop && (last === null || z.top - last < 16)) { out.push(text(z.ws)); last = z.top; } else stop = true; });
+      return out;
+    }
+    var name = (wert("Name:")[0] || "").trim(), geb = (wert("Geburtsdatum:")[0] || "").trim(), anschrift = wert("Anschrift:");
+    d.person = [name].concat(anschrift).concat(geb ? [geb] : []);
+    var pid = w1.filter(function (w) { return /^P\d{4}-\d{2}-\d{2}-\d{7}-[A-Z]$/.test(w.text); })[0];
+    d.person_nwr = pid ? pid.text : "";
+    // Aktenzeichen aus der Kopfzeile "… | J 794 W 1889 / 9870"
+    seiten.some(function (s) { return s.words.some(function (w) { var m = /\|.*\bW\s*(\d+)/.exec(w.text); if (m) { d.aktenzeichen = m[1]; return true; } return false; }); });
+
+    // --- Erlaubnisse und Waffen
+    var docs = [], aktDoc = null, spalten = null;
+    seiten.forEach(function (seite) {
+      var ws = seite.words;
+      var kopf = {};
+      ws.forEach(function (w) {
+        [["art", "Art"], ["kal", "Kaliber"], ["her", "Hersteller / Modell"], ["sn", "Seriennummer"], ["aus", "Austragsdatum"], ["st", "Status vom Eintrag"], ["nwr", "NwrId"]]
+          .forEach(function (l) { if (w.text === l[1] && !kopf[l[0]]) kopf[l[0]] = w; });
+        // "Austragsdatum" und "Status vom Eintrag" kleben oft zu einem Wort zusammen
+        if (!kopf.aus && w.text.indexOf("Austragsdatum") === 0 && w.text.length > 13) {
+          kopf.aus = w; var anteil = 13 / w.text.length;
+          kopf.st = { x0: w.x0 + (w.x1 - w.x0) * anteil + 2 };
+        }
+      });
+      if (kopf.nwr && kopf.sn && kopf.kal) spalten = { art: kopf.art ? kopf.art.x0 - 6 : 50, kal: kopf.kal.x0 - 3, her: kopf.her.x0 - 3, sn: kopf.sn.x0 - 3,
+        aus: kopf.aus ? kopf.aus.x0 - 3 : kopf.st.x0 - 80, st: kopf.st ? kopf.st.x0 - 3 : kopf.nwr.x0 - 100, nwr: kopf.nwr.x0 - 3 };
+      // Dokumente (Erlaubnisse) auf dieser Seite, in Reihenfolge
+      var marker = ws.filter(function (w) { return w.text.indexOf("Dokument Nr.:") === 0; }).sort(function (a, b) { return a.top - b.top; });
+      var dokAuf = marker.map(function (m) {
+        var zeile = ws.filter(function (w) { return Math.abs(w.top - m.top) < 3; });
+        var zeile2 = ws.filter(function (w) { return w.top > m.top + 5 && w.top < m.top + 20; });
+        function feld(arr, pre) { var w = arr.filter(function (x) { return x.text.indexOf(pre) === 0; })[0]; return w ? w.text.slice(pre.length).trim() : ""; }
+        return { top: m.top, dok_nr: m.text.replace("Dokument Nr.:", "").trim(), art: feld(zeile, "Art:"), nwr: feld(zeile, "NWR Id:"),
+          status: feld(zeile, "Status:"), behoerde: feld(zeile2, "Ausstellende Behörde:"), items: [] };
+      });
+      dokAuf.forEach(function (x) { docs.push(x); });
+      if (!spalten) return;
+      var sp = spalten;
+      var anker = ws.filter(function (w) { return w.x0 >= sp.nwr && NWR_ITEM.test(w.text); }).sort(function (a, b) { return a.top - b.top; });
+      anker.forEach(function (a) {
+        var doc = null;
+        dokAuf.forEach(function (x) { if (x.top < a.top) doc = x; });
+        if (!doc) doc = aktDoc;
+        if (!doc) return;
+        aktDoc = doc;
+        var grenzen = [sp.art, sp.kal, sp.her, sp.sn, sp.aus, sp.st, sp.nwr];
+        var blk = [];
+        ws.filter(function (w) { return w.top >= a.top - 2 && w.top < a.top + 13; }).forEach(function (w) {
+          // ein Textstück, das über eine Spaltengrenze läuft, an der passenden Leerstelle teilen
+          var g = grenzen.filter(function (x) { return x > w.x0 + 3 && x < w.x1 - 3; })[0];
+          if (g == null || w.text.indexOf(" ") < 0) { blk.push(w); return; }
+          var pos = Math.round((g - w.x0) / (w.x1 - w.x0) * w.text.length), best = -1;
+          for (var k = 0; k < w.text.length; k++) if (w.text[k] === " " && (best < 0 || Math.abs(k - pos) < Math.abs(best - pos))) best = k;
+          var t1 = w.text.slice(0, best).trim(), t2 = w.text.slice(best + 1).trim();
+          blk.push({ text: t1, x0: w.x0, x1: g - 1, top: w.top }, { text: t2, x0: g + 1, x1: w.x1, top: w.top });
+        });
+        function sp2(xa, xb) { return zeilen(blk.filter(function (w) { return w.x0 >= xa && w.x0 < xb; })).map(function (z) { return text(z.ws); }); }
+        var nr = sp2(-1e9, sp.art).join(" ").trim();
+        var artZ = sp2(sp.art, sp.kal), her = sp2(sp.her, sp.sn), aus = sp2(sp.aus, sp.st).join(" ").trim();
+        var artText = artZ.join(" ").replace(/\s+/g, " ").trim(), kat = "", m = /^Kat\.?\s*([A-D0-9]{1,2})\b\s*(.*)$/.exec(artText);
+        if (m) { kat = m[1]; artText = m[2].trim(); }
+        doc.items.push({ nr: nr, kat: kat, text: artText, kaliber: sp2(sp.kal, sp.her).join(" ").trim(), hersteller: her.join(", "),
+          seriennr: sp2(sp.sn, sp.aus).join(" ").trim(), status: sp2(sp.st, sp.nwr).join(" ").trim(), ausgetragen: !!aus, nwr: a.text });
+      });
+    });
+
+    // --- Waffen je Dokument gruppieren: Nr. 1, 2, … = Waffen/Teile im Besitz; Nr. 0 = zusammengefügte Teile einer Waffe (gleiche Seriennummer)
+    var mitWaffen = docs.filter(function (x) { return x.items.some(function (it) { return !it.ausgetragen; }); });
+    var mehrere = mitWaffen.length > 1;
+    mitWaffen.forEach(function (doc) {
+      var aktiv = doc.items.filter(function (it) { return !it.ausgetragen; });
+      var haupt = aktiv.filter(function (it) { return it.nr && it.nr !== "0"; });
+      var teile = aktiv.filter(function (it) { return !it.nr || it.nr === "0"; });
+      var snN = function (x) { return String(x || "").toUpperCase().replace(/[\s\-\/\.]/g, ""); };
+      haupt.forEach(function (h) {
+        var g = mehrere ? h.nr + " (" + doc.dok_nr + ")" : h.nr, istWaffe = /^W/.test(h.nwr);
+        d.items.push({ nr: g, gruppe: g, art: istWaffe ? "Waffe" : h.text, nwr: h.nwr, waffenart: h.text, kategorie: h.kat, ausfuehrung: "",
+          kaliber: h.kaliber, hersteller: h.hersteller, seriennr: h.seriennr });
+        if (!istWaffe) return;
+        teile.filter(function (t) { return !t.zugeordnet && snN(t.seriennr) && snN(t.seriennr) === snN(h.seriennr); }).forEach(function (t) {
+          t.zugeordnet = true;
+          d.items.push({ nr: "", gruppe: g, art: t.text, nwr: t.nwr, waffenart: h.text, kategorie: t.kat, ausfuehrung: "",
+            kaliber: t.kaliber, hersteller: t.hersteller, seriennr: t.seriennr });
+        });
+      });
+      teile.filter(function (t) { return !t.zugeordnet; }).forEach(function (t) {
+        var g = "0" + (mehrere ? " (" + doc.dok_nr + ")" : "");
+        d.items.push({ nr: g, gruppe: g, art: t.text, nwr: t.nwr, waffenart: t.text, kategorie: t.kat, ausfuehrung: "",
+          kaliber: t.kaliber, hersteller: t.hersteller, seriennr: t.seriennr });
+      });
+    });
+    var haupt = mitWaffen[0] || docs[0] || {};
+    d.dok_nr = haupt.dok_nr || ""; d.erlaubnis = haupt.art || ""; d.erlaubnis_nwr = haupt.nwr || ""; d.behoerde = haupt.behoerde || "";
+    var andere = docs.filter(function (x) { return x !== haupt; });
+    if (andere.length) d.erlaubnis += "; außerdem " + andere.map(function (x) { return x.art + " (" + x.dok_nr + ")"; }).join(", ");
+    d.erlaubnisse = docs.map(function (x) { return { dok_nr: x.dok_nr, art: x.art, nwr: x.nwr, status: x.status }; });
+
+    // --- Aufbewahrungsort und Behältnisse
+    seiten.forEach(function (seite) {
+      var ws = seite.words;
+      var titel = ws.filter(function (w) { return w.text === "Aufbewahrungsbehältnisse"; })[0];
+      if (!titel) return;
+      var bh = ws.filter(function (w) { return /^Behältnis \d+:$/.test(w.text) && w.top > titel.top; }).sort(function (a, b) { return a.top - b.top; });
+      bh.forEach(function (b, i) {
+        var bis = i + 1 < bh.length ? bh[i + 1].top - 3 : 1e9;
+        var zz = zeilen(ws.filter(function (w) { return w.x0 > b.x1 && w.top >= b.top - 3 && w.top < bis && !/^Seite \d+$/.test(w.text); })).map(function (z) { return text(z.ws); });
+        var e = { norm: "", bez: "", sn: "", nachweis: "", verschluss: "", bemerkung: "" }, inBem = false;
+        zz.forEach(function (z, k) {
+          var m2 = /^(Bez\.|SN|Nachweis|Verschluss|Bemerkungen):\s*(.*)$/.exec(z);
+          if (m2) { inBem = m2[1] === "Bemerkungen"; var key = { "Bez.": "bez", SN: "sn", Nachweis: "nachweis", Verschluss: "verschluss", Bemerkungen: "bemerkung" }[m2[1]]; e[key] = m2[2]; }
+          else if (inBem) e.bemerkung = (e.bemerkung ? e.bemerkung + " " : "") + z;
+          else if (k === 0) e.norm = z;
+        });
+        d.behaeltnisse.push(e);
+      });
+      var ort = ws.filter(function (w) { return w.text === "Ort:"; })[0];
+      if (ort) {
+        var nach = ws.filter(function (w) { return w.top > ort.top + 25 && w.x0 < ort.x0 + 60 && w.x0 > ort.x0 + 10; }).sort(function (a, b) { return a.top - b.top; })[0];
+        var z3 = zeilen(ws.filter(function (w) { return w.x0 > ort.x1 && w.top >= ort.top - 3 && w.top < Math.min(ort.top + 40, nach ? nach.top - 2 : 1e9) && w.x0 < 260; })).map(function (z) { return text(z.ws); });
+        if (z3.length > 1) d.aufbewahrungsort = z3.slice(1).join(", ");
+      }
+    });
+    if (!d.items.length && !docs.length) throw new Error("Keine Erlaubnisse/Waffen gefunden – ist das ein NWR-Auszug „Personendaten“?");
+    return d;
+  }
+  function auswerten(seiten) { return istPersonendaten(seiten) ? personendatenAuswerten(seiten) : stammdatenAuswerten(seiten); }
+  // Vorbelegung für die Aufbewahrung aus den Behältnisdaten
+  function behaeltnisVorbelegung(d) {
+    var b = (d && d.behaeltnisse) || [];
+    if (!b.length) return {};
+    return {
+      behaeltnis: b.map(function (e) { return [e.bez, e.sn ? "SN " + e.sn : "", e.verschluss ? "Schloss " + e.verschluss.toLowerCase() : ""].filter(Boolean).join(", "); }).join(" / "),
+      widerstandsgrad: b.map(function (e) { return [e.norm, e.bemerkung].filter(Boolean).join(" – "); }).join(" / "),
+    };
+  }
+
   // ------------------------------------------------------------------ bauen
   async function formularBauen(PDFLib, d, originalBytes, optionen) {
     optionen = optionen || {};
@@ -13375,7 +13527,7 @@ var qrcode = function() {
   }
 
   async function lesen(pdfjs, bytes) {
-    return stammdatenAuswerten(await seitenWoerter(pdfjs, bytes.slice(0)));
+    return auswerten(await seitenWoerter(pdfjs, bytes.slice(0)));
   }
 
   // Fertigen, abgeschlossenen Bogen aus den in der App erfassten Werten bauen
@@ -13396,7 +13548,7 @@ var qrcode = function() {
   async function verarbeiten(pdfjs, PDFLib, bytes, optionen) {
     // pdf.js "verbraucht" den Puffer – deshalb Kopien verwenden
     var seiten = await seitenWoerter(pdfjs, bytes.slice(0));
-    var d = stammdatenAuswerten(seiten);
+    var d = auswerten(seiten);
     var out = await formularBauen(PDFLib, d, bytes.slice(0), optionen);
     return { daten: d, bytes: out, name: dateiname(d) };
   }
@@ -13478,7 +13630,7 @@ var qrcode = function() {
     f.SB_Name = ((sb.anrede || "") + " " + (sb.name || "")).trim(); f.SB_Zimmer = sb.zimmer || ""; f.SB_Durchwahl = sb.durchwahl || "";
     return f;
   }
-  function aktenzeichenAus(d) { return String((d && d.dok_nr) || "").split("/")[0].trim(); }
+  function aktenzeichenAus(d) { return d && d.aktenzeichen ? String(d.aktenzeichen) : String((d && d.dok_nr) || "").split("/")[0].trim(); }
   function einsetzen(s, f) { return String(s || "").replace(/«([^»]+)»/g, function (m, k) { return f[k] != null ? f[k] : ""; }); }
 
   async function kostenbescheid(PDFLib, d, werte, V, optionen) {
@@ -13601,7 +13753,7 @@ var qrcode = function() {
   }
 
   global.Waffenkontrolle = { sha256js: sha256js, verarbeiten: verarbeiten, einfrieren: einfrieren, lesen: lesen, abschliessen: abschliessen,
-    kaliberListe: kaliberListe, dateiname: dateiname, kostenbescheid: kostenbescheid, bescheidFelder: bescheidFelder, aktenzeichenAus: aktenzeichenAus, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, GRUENDE: GRUENDE, EXTRA_KALIBER: 3 };
+    kaliberListe: kaliberListe, dateiname: dateiname, kostenbescheid: kostenbescheid, bescheidFelder: bescheidFelder, aktenzeichenAus: aktenzeichenAus, behaeltnisVorbelegung: behaeltnisVorbelegung, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, GRUENDE: GRUENDE, EXTRA_KALIBER: 3 };
 })(typeof window !== "undefined" ? window : globalThis);
 
 </script>
@@ -13900,8 +14052,8 @@ var qrcode = function() {
         if (liste.some(function (p) { return p.id === id; })) { doppelt.push(d.person[0] || files[i].name); continue; }
         var name = d.person[0] || "";
         var p = { id: id, daten: d, original: bytes, dateiname: files[i].name,
-          werte: { kontrolle_ort: adresse(d), anwesend: name, name_besitzer: name,
-            kontrolleur: meinName.value.trim(), name_kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim() },
+          werte: Object.assign({ kontrolle_ort: d.aufbewahrungsort || adresse(d), anwesend: name, name_besitzer: name,
+            kontrolleur: meinName.value.trim(), name_kontrolleur: meinName.value.trim(), begleiter: begleiterIn.value.trim() }, WK.behaeltnisVorbelegung(d)),
           sig: {}, schritt: 1, status: "offen", fertig: false, reihenfolge: Date.now() + i };
         liste.push(p); await dbPut(p); neu++;
       } catch (e) { console.error(e); fehler.push(files[i].name + ": " + (e.message || e)); }
