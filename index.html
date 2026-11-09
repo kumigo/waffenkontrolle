@@ -13279,6 +13279,27 @@ var qrcode = function() {
     y -= 16;
 
     if (!VERWEIGERT) {
+    // ---- Aufbewahrung (zuerst: Behältnis, Seriennummer, Zertifizierung – Reihenfolge wie bei der Kontrolle)
+    var xj = W - RAND - 55;
+    function frageZeile(i) {
+      txt(RAND + 6, y - 12, FRAGEN[i], F.n, 9);
+      jn("frage" + ("0" + (i + 1)).slice(-2), xj, y - 15);
+      linie(RAND, y - 18, W - RAND, y - 18, 0.3, rgb(0.87, 0.87, 0.87));
+      y -= 19;
+    }
+    abschnitt("Aufbewahrung");
+    var x = RAND;
+    [["Aufbewahrungsbehältnis (Hersteller, Typ, Seriennummer)", "behaeltnis", 0.6], ["Widerstandsgrad / Norm / Zertifizierung", "widerstandsgrad", 0.4]].forEach(function (r) {
+      txt(x, y - 8, r[0], F.n, 7, GRAU);
+      feld(r[1], x, y - 27, bb * r[2] - 4, 17);
+      x += bb * r[2];
+    });
+    y -= 34;
+    txt(xj - 6, y - 4, "Ja", F.b, 7.5); txt(xj + 22, y - 4, "Nein", F.b, 7.5);
+    y -= 4;
+    frageZeile(0);
+    y -= 16;
+
     // ---- Tabelle
     var cols = [["Nr.", 20], ["Gegenstand / Waffenart", 118], ["Hersteller/Modell · Kaliber", 108],
       ["Seriennr. · NWR-ID", 108], ["Ja", 30], ["Nein", 30]];
@@ -13371,26 +13392,12 @@ var qrcode = function() {
     });
     y -= 14;
 
-    // ---- Aufbewahrung
-    var bedarf = 14 + FRAGEN.length * 19 + 30 + 18 + 20 + 70;
-    if (y - bedarf < 20 * mm) { neueSeite(); y -= 4; }
-    abschnitt("Aufbewahrung", true);
+    // ---- Ergebnis: Verstoß + Bemerkungen (am Ende, wie im Ablauf der Kontrolle)
+    if (y - (14 + 19 + 110) < 20 * mm) { neueSeite(); y -= 4; }
+    abschnitt("Ergebnis der Kontrolle", true);
     y += 6;
-    var xj = W - RAND - 55;
-    FRAGEN.forEach(function (fr, i) {
-      txt(RAND + 6, y - 12, fr, F.n, 9);
-      jn("frage" + ("0" + (i + 1)).slice(-2), xj, y - 15);
-      linie(RAND, y - 18, W - RAND, y - 18, 0.3, rgb(0.87, 0.87, 0.87));
-      y -= 19;
-    });
-    y -= 6;
-    var x = RAND;
-    [["Aufbewahrungsbehältnis (Hersteller, Typ)", "behaeltnis", 0.6], ["Widerstandsgrad / Norm", "widerstandsgrad", 0.4]].forEach(function (r) {
-      txt(x, y - 8, r[0], F.n, 7, GRAU);
-      feld(r[1], x, y - 27, bb * r[2] - 4, 17);
-      x += bb * r[2];
-    });
-    y -= 36;
+    frageZeile(1);
+    y -= 8;
     bemerkungsFeld("Bemerkungen / festgestellte Mängel / Auflagen");
     } else {
       bemerkungsFeld("Bemerkungen", true);
@@ -13859,7 +13866,7 @@ var qrcode = function() {
 (function () {
   "use strict";
   var WK = window.Waffenkontrolle, pdfjs = window.pdfjsLib;
-  var SCHRITTE = ["Start", "Waffen", "Munition", "Aufbewahrung", "Übersicht", "Unterschrift"];
+  var SCHRITTE = ["Start", "Aufbewahrung", "Waffen", "Munition", "Übersicht", "Unterschrift"];
   var liste = [];   // alle Personen der Kontrollliste
   var st = null;    // gerade bearbeitete Person
   var $ = function (id) { return document.getElementById(id); };
@@ -13982,6 +13989,11 @@ var qrcode = function() {
       grp.querySelectorAll("button").forEach(function (x) { x.classList.toggle("an", x.getAttribute("data-v") === st.werte[name]); });
       speichern(); navAktualisieren();
       if (name === "zugang") {
+        // Kontrolle beginnt beim Klingeln: Datum und Uhrzeit von jetzt setzen
+        if (st.werte.zugang && !st.werte.kontrolle_von) {
+          st.werte.kontrolle_datum = heute(); st.werte.kontrolle_von = jetztZeit();
+          ["kontrolle_datum", "kontrolle_von"].forEach(function (k) { var f = document.querySelector('[data-name="' + k + '"]'); if (f) f.value = st.werte[k]; });
+        }
         // niemand angetroffen: vorbelegte Anwesende / Name Besitzer leeren
         var nm = st.daten.person[0] || "";
         if (st.werte.zugang === "NA") { if (st.werte.anwesend === nm) st.werte.anwesend = ""; if (st.werte.name_besitzer === nm) st.werte.name_besitzer = ""; }
@@ -13991,7 +14003,7 @@ var qrcode = function() {
         verweigertBox();
       }
       if (name === "frage02" && $("verstossKarte")) { $("verstossKarte").innerHTML = verstossHtml(); alleWachsen(); }
-      if (st.schritt === 2) {
+      if (st.schritt === 3) {
         // Hauptwaffe "Ja" -> alle noch offenen Waffenteile dieser Waffe ebenfalls "Ja"
         var card = grp.closest(".card"), box = card && card.querySelector("[data-teilebox]");
         if (box && st.werte[name] === "Ja" && !grp.closest("[data-teilebox]")) {
@@ -14497,7 +14509,6 @@ var qrcode = function() {
       st.status = "begonnen";
       var w = st.werte;
       if (!w.kontrolle_datum) w.kontrolle_datum = heute();
-      if (!w.kontrolle_von) w.kontrolle_von = jetztZeit();
       if (!w.kontrolleur) w.kontrolleur = meinName.value.trim();
       if (!w.name_kontrolleur) w.name_kontrolleur = w.kontrolleur || meinName.value.trim();
       if (!w.begleiter) w.begleiter = begleiterIn.value.trim();
@@ -14513,10 +14524,10 @@ var qrcode = function() {
     nav.querySelectorAll("button").forEach(function (b) { b.onclick = function () { if (st && !st.fertig) zeigeSchritt(+b.getAttribute("data-s")); }; });
   }
   function offen() {
-    var d = st.daten, w = st.werte, o = { start: 0, waffen: 0, munition: 0, fragen: 0, sig: 0 };
+    var d = st.daten, w = st.werte, o = { start: 0, aufbewahrung: 0, waffen: 0, munition: 0, verstoss: 0, sig: 0 };
     WK.FRAGEN_START.forEach(function (f) { if (!w[f[0]]) o.start++; });
     if (!w.zugang) o.start++;
-    if (w.zugang === "Nein" || w.zugang === "NA") { if (w.zugang === "Nein" && !w.frage02) o.fragen++; if (!st.sig.kontrolleur) o.sig++; return o; }
+    if (w.zugang === "Nein" || w.zugang === "NA") { if (w.zugang === "Nein" && !w.frage02) o.verstoss++; if (!st.sig.kontrolleur) o.sig++; return o; }
     d.items.forEach(function (it, i) { if (!w["pos" + pos(i) + "_vorhanden"]) o.waffen++; });
     var kl = WK.kaliberListe(d);
     kl.kaliber.forEach(function (k, i) { if (!w["mun" + pos(i) + "_vorhanden"]) o.munition++; });
@@ -14524,14 +14535,14 @@ var qrcode = function() {
       var n = pos(kl.kaliber.length + e);
       if ((w["mun" + n + "_kaliber"] || "").trim() && !w["mun" + n + "_vorhanden"]) o.munition++;
     }
-    WK.FRAGEN.forEach(function (f, i) { if (!w["frage" + pos(i)]) o.fragen++; });
+    WK.FRAGEN.forEach(function (f, i) { if (!w["frage" + pos(i)]) { if (i === 1) o.verstoss++; else o.aufbewahrung++; } });
     if (!st.sig.besitzer) o.sig++;
     if (!st.sig.kontrolleur) o.sig++;
     return o;
   }
   function navAktualisieren() {
     if (!st) return;
-    var o = offen(), fertig = { 1: !o.start, 2: !o.waffen, 3: !o.munition, 4: !o.fragen, 5: !!st.gezeigt, 6: st.fertig };
+    var o = offen(), fertig = { 1: !o.start, 2: !o.aufbewahrung, 3: !o.waffen, 4: !o.munition && !o.verstoss, 5: !!st.gezeigt, 6: st.fertig };
     $("nav").querySelectorAll("button").forEach(function (b) {
       var s = +b.getAttribute("data-s");
       b.classList.toggle("aktiv", s === st.schritt);
@@ -14566,7 +14577,7 @@ var qrcode = function() {
     if (!$("nav").children.length) navAufbauen();
     $("wer").innerHTML = "<b>" + esc(st.daten.person[0] || "") + "</b><br>Dok-Nr. " + esc(st.daten.dok_nr || "");
     for (var i = 1; i <= 6; i++) $("s-" + i).classList.toggle("versteckt", i !== n);
-    [null, schritt1, schritt2, schritt3, schritt4, schritt5, schritt6][n]($("s-" + n));
+    [null, schritt1, schrittAufbewahrung, schrittWaffen, schrittMunition, schritt5, schritt6][n]($("s-" + n));
     $("zurueck").textContent = (n === 1 || st.fertig) ? "‹ Übersicht" : "‹ Zurück";
     $("zurueck").classList.toggle("versteckt", st.fertig);
     $("weiter").textContent = (st.fertig || n === 6) ? "Zur Übersicht" : "Weiter ›";
@@ -14590,7 +14601,15 @@ var qrcode = function() {
       '<dt>Behörde</dt><dd>' + esc(d.behoerde || "") + '</dd>' +
       '<dt>Person-NWR-ID</dt><dd>' + esc(d.person_nwr || "") + '</dd>' +
       '</dl>' + (adr ? '<div class="route">' + routeLinks(adr, true) + '</div>' +
-        '<p class="klein muted" style="margin:8px 0 0">Erst beim Antippen wird die Adresse an Apple bzw. Google übergeben.</p>' : "") +
+        '<p class="klein muted" style="margin:8px 0 0">Erst beim Antippen wird die Adresse an Apple Karten übergeben.</p>' : "") +
+      '</div>' +
+      '<div class="card"><h3>Kontrolle</h3>' +
+      '<div class="zeile"><div class="was">Kontrolle wurde …</div><span class="jn" data-name="zugang">' +
+      '<button type="button" class="ja' + (st.werte.zugang === "Ja" ? " an" : "") + '" data-v="Ja" style="width:110px">gestattet</button>' +
+      '<button type="button" class="nein' + (st.werte.zugang === "Nein" ? " an" : "") + '" data-v="Nein" style="width:110px">verweigert</button>' +
+      '<button type="button" class="na' + (st.werte.zugang === "NA" ? " an" : "") + '" data-v="NA" style="width:150px">nicht angetroffen</button></span></div>' +
+      '<div id="verweigertBox"></div>' +
+      WK.FRAGEN_START.map(function (f) { return '<div class="zeile"><div class="was">' + esc(f[1]) + '</div>' + jnHtml(f[0]) + '</div>'; }).join("") +
       '</div>' +
       '<div class="card"><h3>Angaben zur Kontrolle</h3><div class="grid">' +
       inputHtml("kontrolle_datum", "Datum") +
@@ -14601,15 +14620,7 @@ var qrcode = function() {
       inputHtml("kontrolleur", "Kontrollierende/r") +
       inputHtml("begleiter", "Begleiter/in") +
       inputHtml("anwesend", "Anwesende Person(en)") +
-      '</div></div>' +
-      '<div class="card"><h3>Kontrolle</h3>' +
-      '<div class="zeile"><div class="was">Kontrolle wurde …</div><span class="jn" data-name="zugang">' +
-      '<button type="button" class="ja' + (st.werte.zugang === "Ja" ? " an" : "") + '" data-v="Ja" style="width:110px">gestattet</button>' +
-      '<button type="button" class="nein' + (st.werte.zugang === "Nein" ? " an" : "") + '" data-v="Nein" style="width:110px">verweigert</button>' +
-      '<button type="button" class="na' + (st.werte.zugang === "NA" ? " an" : "") + '" data-v="NA" style="width:150px">nicht angetroffen</button></span></div>' +
-      '<div id="verweigertBox"></div>' +
-      WK.FRAGEN_START.map(function (f) { return '<div class="zeile"><div class="was">' + esc(f[1]) + '</div>' + jnHtml(f[0]) + '</div>'; }).join("") +
-      '</div>';
+      '</div></div>';
     verweigertBox();
   }
   // keine Prüfung möglich: verweigert oder niemand angetroffen
@@ -14638,7 +14649,7 @@ var qrcode = function() {
     if (!verweigert()) { b.innerHTML = ""; return; }
     if (nichtAngetroffen()) {
       b.innerHTML = '<div style="padding:4px 0 12px">' + inputHtml("bemerkungen", "Bemerkungen (z. B. Benachrichtigung hinterlassen)", { textarea: true }) +
-        '<div class="hinweisbox gelb" style="margin:12px 0 0"><b>Niemand angetroffen:</b> Die Schritte Waffen, Munition und Aufbewahrung entfallen. ' +
+        '<div class="hinweisbox gelb" style="margin:12px 0 0"><b>Niemand angetroffen:</b> Die Schritte Aufbewahrung, Waffen und Munition entfallen. ' +
         'Mit „Weiter“ geht es direkt zur Übersicht. Es unterschreibt nur die/der Kontrollierende, ein Kostenbescheid entsteht nicht.</div></div>';
       alleWachsen(); return;
     }
@@ -14646,7 +14657,7 @@ var qrcode = function() {
       WK.GRUENDE.map(function (g) { return '<button type="button" class="chip' + (st.werte[g[0]] === "X" ? " an" : "") + '" data-chip="' + g[0] + '">' + esc(g[1]) + '</button>'; }).join("") +
       '</div><div style="margin-top:10px">' + inputHtml("grund_sonstig", "sonstiger Grund (bitte benennen)") + '</div>' +
       '<div style="margin-top:10px">' + inputHtml("bemerkungen", "Bemerkungen", { textarea: true }) + '</div>' +
-      '<div class="hinweisbox err" style="margin:12px 0 0"><b>Kontrolle verweigert:</b> Die Schritte Waffen, Munition und Aufbewahrung entfallen. ' +
+      '<div class="hinweisbox err" style="margin:12px 0 0"><b>Kontrolle verweigert:</b> Die Schritte Aufbewahrung, Waffen und Munition entfallen. ' +
       'Mit „Weiter“ geht es direkt zu den Unterschriften.</div>' +
       '<div class="card" id="verstossKarte" style="margin:12px 0 0">' + verstossHtml() + '</div></div>';
     alleWachsen();
@@ -14655,7 +14666,7 @@ var qrcode = function() {
   // ---------- Schritt 2
   var offeneGruppen = {};
   function snNorm(x) { return String(x || "").toUpperCase().replace(/[\s\-\/\.]/g, ""); }
-  function schritt2(el) {
+  function schrittWaffen(el) {
     var d = st.daten, gruppen = [], cur = null;
     d.items.forEach(function (it, i) {
       if (!cur || (it.gruppe || it.nr) !== cur.nr) { cur = { nr: it.gruppe || it.nr, items: [] }; gruppen.push(cur); }
@@ -14731,7 +14742,7 @@ var qrcode = function() {
     };
     $("alleJa").onclick = function () {
       d.items.forEach(function (it, i) { if (!st.werte["pos" + pos(i) + "_vorhanden"]) st.werte["pos" + pos(i) + "_vorhanden"] = "Ja"; });
-      speichern(); schritt2(el); navAktualisieren();
+      speichern(); schrittWaffen(el); navAktualisieren();
     };
   }
   function teileStand() {
@@ -14745,7 +14756,7 @@ var qrcode = function() {
   }
 
   // ---------- Schritt 3
-  function schritt3(el) {
+  function schrittMunition(el) {
     var kl = WK.kaliberListe(st.daten);
     var html = '<h2>Munition</h2><div class="card"><h3>Kaliber laut Stammdatenblatt</h3>';
     if (!kl.kaliber.length) html += '<p class="muted">Keine Kaliber eingetragen.</p>';
@@ -14759,22 +14770,24 @@ var qrcode = function() {
       html += '<div class="zeile"><div class="was"><input class="bem" style="margin:0" data-name="' + n + '_kaliber" placeholder="Kaliber eintragen" value="' +
         esc(st.werte[n + "_kaliber"] || "") + '"></div>' + jnHtml(n + "_vorhanden") + '</div>';
     }
-    el.innerHTML = html + "</div>";
+    el.innerHTML = html + "</div>" +
+      '<div class="card" id="verstossKarte">' + verstossHtml() + '</div>' +
+      '<div class="card">' + inputHtml("bemerkungen", "Bemerkungen / festgestellte Mängel / Auflagen", { textarea: true }) + '</div>';
+    alleWachsen();
   }
 
   // ---------- Schritt 4
-  function schritt4(el) {
-    var html = '<h2>Aufbewahrung</h2><div class="card">';
+  function schrittAufbewahrung(el) {
+    var html = '<h2>Aufbewahrung</h2><p class="muted klein" style="margin-top:0">Tresor öffnen lassen: zuerst Seriennummer und Zertifizierung des Schranks prüfen.</p>' +
+      '<div class="card"><h3>Waffenschrank</h3><div class="grid">' +
+      inputHtml("behaeltnis", "Aufbewahrungsbehältnis (Hersteller, Typ, Seriennummer)") +
+      inputHtml("widerstandsgrad", "Widerstandsgrad / Norm / Zertifizierung") +
+      '</div></div><div class="card">';
     WK.FRAGEN.forEach(function (f, i) {
-      if (i === 1) return; // Verstoß: eigene Karte unten
+      if (i === 1) return; // Verstoß: kommt bei der Munition
       html += '<div class="zeile"><div class="was">' + esc(f) + '</div>' + jnHtml("frage" + pos(i)) + '</div>';
     });
-    html += '</div><div class="card"><div class="grid">' +
-      inputHtml("behaeltnis", "Aufbewahrungsbehältnis (Hersteller, Typ)") +
-      inputHtml("widerstandsgrad", "Widerstandsgrad / Norm") +
-      '</div><div style="margin-top:12px">' + inputHtml("bemerkungen", "Bemerkungen / festgestellte Mängel / Auflagen", { textarea: true }) + '</div></div>' +
-      '<div class="card" id="verstossKarte">' + verstossHtml() + '</div>';
-    el.innerHTML = html;
+    el.innerHTML = html + '</div>';
     alleWachsen();
   }
 
@@ -14782,9 +14795,10 @@ var qrcode = function() {
   function probleme(ohneSig) {
     var o = offen(), p = [], vw = verweigert();
     if (o.start) p.push(o.start + " Angabe(n) zur Kontrolle offen (Schritt 1)");
-    if (o.waffen) p.push(o.waffen + " Waffe(n)/Waffenteil(e) ohne Ja/Nein (Schritt 2)");
-    if (o.munition) p.push(o.munition + " Kaliber ohne Ja/Nein (Schritt 3)");
-    if (o.fragen) p.push(o.fragen + " Frage(n) zur Aufbewahrung offen (Schritt 4)");
+    if (o.aufbewahrung) p.push(o.aufbewahrung + " Frage(n) zur Aufbewahrung offen (Schritt 2)");
+    if (o.waffen) p.push(o.waffen + " Waffe(n)/Waffenteil(e) ohne Ja/Nein (Schritt 3)");
+    if (o.munition) p.push(o.munition + " Kaliber ohne Ja/Nein (Schritt 4)");
+    if (o.verstoss) p.push("Frage „Verstoß festgestellt?“ offen (" + (vw ? "Schritt 1" : "Schritt 4") + ")");
     if (!ohneSig) {
       if (!st.sig.besitzer && !vw) p.push("Unterschrift Waffenbesitzer/in fehlt");
       if (st.werte.frage02 === "Ja" && !st.sig.kontrolleur_a1) p.push("Unterschrift Waffenbehörde auf Anlage 1 fehlt");
@@ -14806,7 +14820,7 @@ var qrcode = function() {
     el.innerHTML = '<h2>Übersicht</h2>' +
       '<p>Bitte der Waffenbesitzerin / dem Waffenbesitzer zeigen. <b>Leere Felder sind durchgestrichen</b> und können nach der Unterschrift nicht mehr ergänzt werden.</p>' +
       (vw ? (nichtAngetroffen() ? '<div class="hinweisbox gelb"><b>Niemand angetroffen.</b> Die Kontrolle wurde nicht durchgeführt.</div>'
-        : '<div class="hinweisbox err"><b>Kontrolle verweigert.</b> Waffen, Munition und Aufbewahrung wurden nicht geprüft.</div>') : "") +
+        : '<div class="hinweisbox err"><b>Kontrolle verweigert.</b> Aufbewahrung, Waffen und Munition wurden nicht geprüft.</div>') : "") +
       (st.werte.frage02 === "Ja" ? '<div class="hinweisbox err"><b>Verstoß festgestellt</b> – Anlage 1 ist im Protokoll angehängt.</div>' : "") +
       (pr.length ? '<div class="hinweisbox warn"><b>Noch offen (wird durchgestrichen):</b><ul>' + pr.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + '</ul></div>'
         : '<div class="hinweisbox ok"><b>Alles ausgefüllt.</b></div>') +
