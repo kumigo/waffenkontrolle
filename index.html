@@ -13187,9 +13187,7 @@ var qrcode = function() {
     if (adresse && !S) {
       var ziel = encodeURIComponent(adresse);
       var bx = RAND + 150, bw = 108, bh = 17;
-      [["Route in Apple Karten", "route_apple", "https://maps.apple.com/?daddr=" + ziel + "&dirflg=d"],
-       ["Route in Google Maps", "route_google", "https://www.google.com/maps/dir/?api=1&destination=" + ziel + "&travelmode=driving"]
-      ].forEach(function (b, i) {
+      [["Route in Apple Karten", "route_apple", "https://maps.apple.com/?daddr=" + ziel + "&dirflg=d"]].forEach(function (b, i) {
         var by = top - 30 - i * (bh + 5);
         var rb = form.createButton(b[1]);
         rb.addToPage(b[0], page, { x: bx, y: by, width: bw, height: bh, font: F.b, textColor: rgb(1, 1, 1),
@@ -13839,8 +13837,7 @@ var qrcode = function() {
   function pos(i) { return zwei(i + 1); }
   function routeLinks(adr, klein) {
     var z = encodeURIComponent(adr);
-    return '<a class="btn ' + (klein ? "klein " : "") + '" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=' + z + '&dirflg=d">Apple Karten</a>' +
-      '<a class="btn sec ' + (klein ? "klein" : "") + '" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=' + z + '&travelmode=driving">Google Maps</a>';
+    return '<a class="btn ' + (klein ? "klein " : "") + '" target="_blank" rel="noopener" href="https://maps.apple.com/?daddr=' + z + '&dirflg=d">Apple Karten</a>';
   }
   function herunterladen(bytes, name) {
     var url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" })), a = document.createElement("a");
