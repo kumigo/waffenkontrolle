@@ -132,6 +132,7 @@
   .person.begonnen .status { background:#e3a72f; color:#fff; font-size:16px; }
   .person .info { flex:1; min-width:0; }
   .person .info b { font-size:17px; }
+  .person .info .az { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:6px; background:#e8eef7; color:#1f4f8a; font-size:14px; font-weight:600; vertical-align:2px; }
   .person .info .zeile2 { color:var(--muted); font-size:14px; }
   .person .aktionen { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
   .fortschritt { height:8px; background:#e3e8ef; border-radius:4px; overflow:hidden; margin:6px 0 14px; }
@@ -14086,7 +14087,8 @@ var qrcode = function() {
           '<button class="btn sec klein" data-akt="drucken" data-i="' + i + '">🖨 Drucken</button>'
         : routeLinks(adr, true) + '<button class="btn klein" data-akt="start" data-i="' + i + '">' + (p.status === "begonnen" ? "Fortsetzen" : "Kontrolle starten") + "</button>";
       return '<li class="person ' + cls + '"><div class="status">' + symbol + '</div>' +
-        '<div class="info"><b>' + esc(d.person[0] || "") + '</b><div class="zeile2">' + esc(adr) + "</div>" +
+        '<div class="info"><b>' + esc(d.person[0] || "") + '</b>' + (WK.aktenzeichenAus(d) ? ' <span class="az">Az. ' + esc(WK.aktenzeichenAus(d)) + '</span>' : "") +
+        '<div class="zeile2">' + esc(adr) + "</div>" +
         '<div class="zeile2">' + anz + " Waffe(n) · Dok-Nr. " + esc(d.dok_nr || "") + "</div>" + zeile3 + "</div>" +
         '<div class="aktionen">' + akt + '<button class="x" title="Aus Liste entfernen" data-akt="weg" data-i="' + i + '">×</button></div></li>';
     }).join("");
