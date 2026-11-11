@@ -114,6 +114,10 @@ canvas.sk{display:block;width:100%;height:auto;touch-action:none}
 /* Unterschrift */
 .sig{border:1px solid var(--line);border-radius:6px;background:#fff;touch-action:none}
 .sig canvas{display:block;width:100%;height:150px;touch-action:none}
+.cwrap.locked,.cwrap.locked canvas,.sig.locked,.sig.locked canvas{touch-action:auto}
+.cwrap.locked,.sig.locked{border-style:dashed;opacity:.92}
+.lockbar{margin:6px 0}
+.btn.lockbtn.on{background:#2e7d32;border-color:#2e7d32;color:#fff}
 .sigline{border-top:1px solid #999;margin:0 12px;font-size:12px;color:var(--muted);padding:2px 0 6px}
 /* Vorgänge */
 .vg{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -455,7 +459,8 @@ ${fText("Nordrichtung / Ausrichtung","skizze.nord")}${fText("Quelle / Nutzungshi
   ${sk.bg?'<button data-act="bgdel">Hintergrund entfernen</button>':""}<button data-act="clear">Alles löschen</button>
 </div>
 <div class="legend">${SK_COLORS.map(([c,t])=>`<span><i style="background:${c}"></i>${esc(t)}</span>`).join("")}</div>
-<div class="cwrap"><canvas class="sk" id="skCanvas" width="1600" height="1100"></canvas></div>
+<div class="row lockbar"><button class="btn lockbtn" data-lock="sk">🔒 Gesperrt – antippen zum Zeichnen</button><span class="note">Gesperrt: Wischen blättert die Seite. Mit Apple Pencil kann trotzdem gezeichnet werden.</span></div>
+<div class="cwrap locked"><canvas class="sk" id="skCanvas" width="1600" height="1100"></canvas></div>
 <input type="file" id="skBg" accept="image/*" hidden>
 <p class="note">Mit dem Finger oder Stift zeichnen. Pfeil = Schussrichtung, Maßlinie fragt nach der Entfernung in Metern. Ein Foto oder Luftbild kann als Hintergrund dienen. Die Kopfzeile ordnet die Skizze diesem Prüfprotokoll zu.</p>
 <h3>Legende und Angaben zur Skizze</h3>
@@ -554,8 +559,8 @@ function sigBlock(key,title,text){
   const v=S.sig[key]||{};
   return `<h3>${esc(title)}</h3>${text?`<div class="box" style="background:var(--light)">${esc(text)}</div>`:""}
 <div class="grid">${fText("Name (Druckbuchstaben)",`sig.${key}.name`)}</div>
-<div style="margin-top:8px" class="sig"><canvas data-sig="${key}" width="900" height="225"></canvas><div class="sigline">Unterschrift</div></div>
-<div class="row" style="margin-top:6px"><button class="btn sm" data-sigclr="${key}">Unterschrift löschen</button>${v.img?'<span class="note">✓ Unterschrift gespeichert</span>':""}</div>`;
+<div style="margin-top:8px" class="sig locked"><canvas data-sig="${key}" width="900" height="225"></canvas><div class="sigline">Unterschrift</div></div>
+<div class="row" style="margin-top:6px"><button class="btn sm lockbtn" data-lock="${key}">🔒 Gesperrt – antippen zum Zeichnen</button><button class="btn sm" data-sigclr="${key}">Unterschrift löschen</button>${v.img?'<span class="note">✓ Unterschrift gespeichert</span>':""}</div>`;
 }
 VIEWS.sig = ()=> `${part("N")}<h2>8. Unterschriften</h2>${ctxLine()}
 <div class="grid">${fText("Ort","sig.ort")}${fText("Datum","sig.datum",{type:"date"})}</div>
@@ -632,6 +637,8 @@ document.addEventListener("click", async e=>{
   if(d.erg){ const nr=t.closest("[data-ci]").dataset.ci; const r=S.check[K(nr)]=S.check[K(nr)]||{}; r.e = r.e===d.erg? "" : d.erg;
     touch(); $$(".seg button",t.parentNode).forEach(b=>b.classList.toggle("on",b.dataset.erg===r.e)); updateCalc(`check.${K(nr)}.e`); return; }
   if(d.tog){ t.closest(".ci").classList.toggle("open"); return; }
+  if(d.lock){ const w = d.lock==="sk"? $(".cwrap") : $(`canvas[data-sig="${d.lock}"]`).parentNode;
+    const l=w.classList.toggle("locked"); t.textContent = l? LOCK_TXT : UNLOCK_TXT; t.classList.toggle("on",!l); return; }
   if(d.tomangel){ const it=itemsAll(S).find(i=>i.nr===d.tomangel); if(!it.text){toast("Bitte zuerst den Prüfpunkt eintragen.");return;}
     S.maengel.push({mangel:`${it.nr} ${it.text}: ${it.r.mangel||it.r.bem||"Abweichung festgestellt"}`,mass:it.r.mass||"",status:"Offen"}); touch(); toast(`Als Mangel Nr. ${S.maengel.length} übernommen`); return; }
   if(t.id==="mAdd"){ S.maengel.push({status:"Offen"}); touch(); render(); setTimeout(()=>{const a=$$("[data-mrow]").pop(); a&&a.scrollIntoView({behavior:"smooth"}); const ta=a&&a.querySelector("textarea"); ta&&ta.focus()},50); return; }
@@ -711,6 +718,7 @@ async function initSketch(){
   redraw();
   const pos=e=>{const r=cv.getBoundingClientRect();return [ (e.clientX-r.left)*cv.width/r.width, (e.clientY-r.top)*cv.height/r.height ]};
   cv.addEventListener("pointerdown",e=>{
+    if(isLocked(cv,e)) return;
     e.preventDefault(); const p=pos(e);
     if(SK.tool==="stamp"||SK.tool==="text"){
       const s = SK.tool==="stamp"? SK.stamp : prompt("Text für die Skizze:");
@@ -739,6 +747,11 @@ async function initSketch(){
   });
 }
 
+/* Zeichen-/Unterschriftsfelder sperren: gesperrt blättert ein Wischen mit dem Finger die Seite,
+   ein Stift (Apple Pencil) zeichnet trotzdem. */
+const LOCK_TXT = "🔒 Gesperrt – antippen zum Zeichnen", UNLOCK_TXT = "✎ Zeichnen aktiv – antippen zum Sperren";
+function isLocked(cv,e){ return cv.parentNode.classList.contains("locked") && e.pointerType!=="pen"; }
+
 /* ---------------------------------------------------------------- Unterschriften */
 function initSigs(){
   $$("canvas[data-sig]").forEach(cv=>{
@@ -747,7 +760,7 @@ function initSigs(){
     const v=(S.sig[key]||{}).img; if(v){ loadImg(v).then(i=>i&&ctx.drawImage(i,0,0,cv.width,cv.height)); }
     let drawing=false, last=null, dirty=false;
     const pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
-    cv.addEventListener("pointerdown",e=>{e.preventDefault();cv.setPointerCapture(e.pointerId);drawing=true;last=pos(e);ctx.fillStyle="#0b1d3a";ctx.beginPath();ctx.arc(last[0],last[1],1.6,0,7);ctx.fill();dirty=true});
+    cv.addEventListener("pointerdown",e=>{if(isLocked(cv,e)) return;e.preventDefault();cv.setPointerCapture(e.pointerId);drawing=true;last=pos(e);ctx.fillStyle="#0b1d3a";ctx.beginPath();ctx.arc(last[0],last[1],1.6,0,7);ctx.fill();dirty=true});
     cv.addEventListener("pointermove",e=>{if(!drawing) return;e.preventDefault();const p=pos(e);ctx.strokeStyle="#0b1d3a";ctx.lineWidth=3.2;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(last[0],last[1]);ctx.lineTo(p[0],p[1]);ctx.stroke();last=p});
     const end=()=>{ if(!drawing) return; drawing=false; if(dirty){ S.sig[key]=Object.assign(S.sig[key]||{}, {img:cv.toDataURL("image/png")}); touch(); } };
     cv.addEventListener("pointerup",end); cv.addEventListener("pointercancel",end);
