@@ -142,8 +142,13 @@ canvas.sk{display:block;width:100%;height:auto;touch-action:none}
   html,body{background:#fff;font-size:10pt}
   header.top,nav.tabs,main,.toast{display:none!important}
   #print{display:block}
-  .pg{page-break-after:always;break-after:page}
-  .pg:last-child{page-break-after:auto;break-after:auto}
+  .pg{margin-top:5mm}
+  .pg:first-child{margin-top:0}
+  .pt{break-after:avoid;page-break-after:avoid}
+  .phg{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+  .phg .ph2{margin:0}
+  .phg .pimg{max-height:62mm;width:auto;max-width:100%}
+  .skimg{max-height:110mm}
   .pt{background:var(--dark)!important;color:#fff!important;padding:5px 8px;font-weight:bold;font-size:12.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .pk{font-size:8pt;font-style:italic;color:#1f3a5f;padding:3px 8px;background:var(--light);-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .pz{font-weight:bold;font-size:9pt;padding:4px 0}
@@ -13100,6 +13105,8 @@ async function exportV(){
 /* ---------------------------------------------------------------- Druck / PDF */
 function pHead(title,p){
   const d=S.deck;
+  if(pHead.done) return `<div class="pt">${esc(title)}</div>`;
+  pHead.done=true;
   return `<div class="pt">${esc(title)}</div><div class="pk">Landkreis Jerichower Land · Untere Waffenbehörde · Abnahme des Gatters / der Weide – Ortsbesichtigung nach § 10 Abs. 5 WaffG</div>
 <div class="pz">Aktenzeichen: ${esc(d.az||"____________")} &nbsp;&nbsp; Ortsbesichtigung am: ${esc(dDE(d.datum)||"____________")} &nbsp;&nbsp; Fläche: ${esc(d.standort||"____________")}</div><div class="pp ${p}">${PART_TXT[p]}</div>`;
 }
@@ -13107,42 +13114,45 @@ const tr=(l,v)=>`<tr><td class="l">${esc(l)}</td><td>${esc(v||"")}</td></tr>`;
 async function doPrint(){
   await save();
   const d=S.deck, x=summary(S);
-  let h="";
+  let h=""; pHead.done=false;
   h+=`<section class="pg">${pHead("1. Allgemeine Angaben (Deckblatt)","A")}<table class="p">
 <tr class="s"><td colspan="2">Verfahren</td></tr>${tr("Aktenzeichen",d.az)}${tr("Art der Fläche",d.flaeche)}${tr("Datum der Ortsbesichtigung",dDE(d.datum))}${tr("Uhrzeit",(d.von||"")+(d.bis?" – "+d.bis:"")+(d.von||d.bis?" Uhr":""))}
 <tr class="s"><td colspan="2">Antragsteller und Schütze</td></tr>${tr("Name des Antragstellers",d.antName)}${tr("Anschrift des Antragstellers",d.antAnschrift)}${tr("Name des Schützen",d.schuetze)}${tr("Waffenrechtliche Erlaubnis des Schützen",d.erlaubnis)}
 <tr class="s"><td colspan="2">Örtlichkeit</td></tr>${tr("Standort des Gatters / der Weide",d.standort)}${tr("Gemarkung",d.gemarkung)}${tr("Flur",d.flur)}${tr("Flurstück(e)",d.flurstueck)}${tr("Koordinaten",d.koord)}
 </table></section>`;
   h+=`<section class="pg">${pHead("2. Checkliste zur Ortsbesichtigung","A")}<table class="p"><tr><th>Nr.</th><th>Prüfpunkt</th><th>Soll</th><th>Ergebnis</th><th>Auswertung</th><th>Bemerkungen</th><th>Festgestellter Mangel</th><th>Erforderliche Maßnahme</th></tr>`;
-  CHECK.forEach((sec,si)=>{ h+=`<tr class="s"><td colspan="8">${si+1}. ${esc(sec.sec)}</td></tr>`;
-    itemsAll(S).filter(i=>i.sec===sec.sec && (i.text||!sec.extra)).forEach(i=>{ const a=ausw(i);
+  CHECK.forEach((sec,si)=>{ const its=itemsAll(S).filter(i=>i.sec===sec.sec && (i.text||!sec.extra)); if(!its.length) return;
+    h+=`<tr class="s"><td colspan="8">${si+1}. ${esc(sec.sec)}</td></tr>`;
+    its.forEach(i=>{ const a=ausw(i);
       h+=`<tr><td>${i.nr}</td><td>${esc(i.text)}</td><td>${esc(i.soll)}</td><td>${esc(i.r.e||"")}</td><td><span class="aw ${AW_CLS[a]||""}">${esc(a)}</span></td><td>${esc(i.r.bem||"")}</td><td>${esc(i.r.mangel||"")}</td><td>${esc(i.r.mass||"")}</td></tr>`; });
   });
   h+=`</table><p class="pnote">Soll = sicherheitstechnisch erwartete Antwort; „Info“ = Sachverhaltsangabe. Die Auswertung ist eine rechnerische Hilfe und keine Sicherheitsbewertung.</p></section>`;
   // Skizze
-  const c=document.createElement("canvas"); c.width=1600; c.height=1100;
-  drawSketch(c.getContext("2d"),S.skizze,await loadImg(S.skizze.bg));
-  const sk=S.skizze;
-  h+=`<section class="pg">${pHead("3. Skizze und Lageplan","A")}<table class="p">${tr("Art der Darstellung",sk.art)}${tr("Maßstab (ca.)",sk.massstab)}${tr("Nordrichtung / Ausrichtung",sk.nord)}${tr("Quelle / Nutzungshinweis",sk.quelle)}</table>
-<img class="pimg" src="${c.toDataURL("image/jpeg",0.9)}" alt="Skizze">
-<table class="p" style="margin-top:6px"><tr><th>Element</th><th>Darstellung</th><th>Beschreibung / Wert</th></tr>${SK_LEG.map(([k,l,dd])=>`<tr><td>${esc(l)}</td><td>${esc(getP(S,`skizze.legend.${k}.sym`)??dd)}</td><td>${esc(getP(S,`skizze.legend.${k}.wert`)||"")}</td></tr>`).join("")}</table></section>`;
+  const sk=S.skizze, hatSkizze = sk.items.length || sk.bg;
+  let skImg="";
+  if(hatSkizze){ const c=document.createElement("canvas"); c.width=1600; c.height=1100; drawSketch(c.getContext("2d"),sk,await loadImg(sk.bg)); skImg=c.toDataURL("image/jpeg",0.9); }
+  const skAng=[["Art der Darstellung",sk.art],["Maßstab (ca.)",sk.massstab],["Nordrichtung / Ausrichtung",sk.nord],["Quelle / Nutzungshinweis",sk.quelle]].filter(a=>a[1]);
+  const skWerte=SK_LEG.filter(([k])=>getP(S,`skizze.legend.${k}.wert`));
+  h+=`<section class="pg">${pHead("3. Skizze und Lageplan","A")}
+${skAng.length?`<table class="p">${skAng.map(a=>tr(a[0],a[1])).join("")}</table>`:""}
+${hatSkizze?`<img class="pimg skimg" src="${skImg}" alt="Skizze"><p class="pnote">Legende: ${SK_LEG.map(([k,l,dd])=>esc(l)+" = "+esc(getP(S,`skizze.legend.${k}.sym`)??dd)).join(" · ")}</p>`:`<p class="pnote">Keine Skizze angefertigt.</p>`}
+${skWerte.length?`<table class="p"><tr><th>Element</th><th>Beschreibung / Wert</th></tr>${skWerte.map(([k,l])=>`<tr><td>${esc(l)}</td><td>${esc(getP(S,`skizze.legend.${k}.wert`))}</td></tr>`).join("")}</table>`:""}</section>`;
   // Fotos
   if(S.fotos.length){
-    for(let i=0;i<S.fotos.length;i+=2){
-      h+=`<section class="pg">${pHead("4. Fotodokumentation","A")}`;
-      S.fotos.slice(i,i+2).forEach((p,k)=>{ const n=i+k+1;
-        h+=`<div class="ph2">${p.img?`<img class="pimg" style="max-height:95mm" src="${p.img}" alt="Bild ${n}">`:`<p class="pnote">Foto nicht übertragen – liegt auf dem Tablet.</p>`}<table class="p">${tr("Bildnummer",String(n))}${tr("Datum der Aufnahme",dDE(p.datum))}${tr("Aufnahmeort",p.ort)}${tr("Blickrichtung",p.blick)}${tr("Beschreibung",p.beschr)}${tr("Festgestellte Sicherheitsmängel",p.maengel)}</table></div>`; });
-      h+=`</section>`;
-    }
+    h+=`<section class="pg">${pHead("4. Fotodokumentation","A")}<div class="phg">`;
+    S.fotos.forEach((p,i)=>{ const n=i+1;
+      const zeilen=[["Bild",String(n)+(p.datum?" · "+dDE(p.datum):"")+(p.blick?" · Blickrichtung "+p.blick:"")],["Aufnahmeort",p.ort],["Beschreibung",p.beschr],["Sicherheitsmängel",p.maengel]].filter(z=>z[1]);
+      h+=`<div class="ph2">${p.img?`<img class="pimg" src="${p.img}" alt="Bild ${n}">`:`<p class="pnote">Foto nicht übertragen – liegt auf dem Tablet.</p>`}<table class="p">${zeilen.map(z=>tr(z[0],z[1])).join("")}</table></div>`; });
+    h+=`</div></section>`;
   } else h+=`<section class="pg">${pHead("4. Fotodokumentation","A")}<p>Keine Fotos aufgenommen.</p></section>`;
   // Mängel + Übersicht
   h+=`<section class="pg">${pHead("5. Festgestellte Mängel und Maßnahmen","A")}<table class="p"><tr><th>Nr.</th><th>Festgestellter Mangel</th><th>Sicherheitsrelevanz</th><th>Erforderliche Maßnahme</th><th>Verantwortlich</th><th>Frist</th><th>Erledigt am</th><th>Status</th><th>Nachkontrolle</th></tr>
 ${S.maengel.filter(m=>m.mangel).length? S.maengel.map((m,i)=>m.mangel?`<tr class="mgp" style="background:${mCls(m)==="krit"?"#f4cccc":mCls(m)==="erl"?"#d9ead3":"#fff2cc"}"><td>${i+1}</td><td>${esc(m.mangel)}</td><td>${esc(m.rel||"")}</td><td>${esc(m.mass||"")}</td><td>${esc(m.verantw||"")}</td><td>${esc(dDE(m.frist))}</td><td>${esc(dDE(m.erl))}</td><td>${esc(mStatus(m))}</td><td>${esc(m.nk||"")}</td></tr>`:"").join("") : '<tr><td colspan="9">Keine Mängel festgestellt.</td></tr>'}</table>
-<div class="pp A" style="margin-top:10px">Automatische Zusammenfassung der Prüfergebnisse</div>
+<div style="break-inside:avoid;page-break-inside:avoid"><div class="pp A" style="margin-top:10px">Automatische Zusammenfassung der Prüfergebnisse</div>
 <div class="status ${x.cls}">${esc(x.st)}</div>
 <table class="p" style="margin-top:6px"><tr><th>Bereich</th><th>Prüfpunkte</th><th>Ja</th><th>Nein</th><th>n. z.</th><th>n. gepr.</th><th>Unbeantw.</th><th>Abweichungen</th></tr>
 ${x.secs.concat([x.tot]).map(r=>`<tr${r.sec==="Gesamt"?' class="s"':""}><td>${esc(r.sec)}</td>${["n","ja","nein","nz","ng","offen","abw"].map(k=>`<td>${r[k]}</td>`).join("")}</tr>`).join("")}</table>
-<p class="pnote">Mängel gesamt ${x.M.ges} · offen ${x.M.offen} · erledigt ${x.M.erl} · kritisch offen ${x.M.krit} · Frist überschritten ${x.M.ueber} · Nachkontrolle erforderlich ${x.M.nk}. Bearbeitungsstand Checkliste ${x.prog} %. Der Gesamtstatus ist eine rechnerische Zusammenfassung der Feststellungen.</p></section>`;
+<p class="pnote">Mängel gesamt ${x.M.ges} · offen ${x.M.offen} · erledigt ${x.M.erl} · kritisch offen ${x.M.krit} · Frist überschritten ${x.M.ueber} · Nachkontrolle erforderlich ${x.M.nk}. Bearbeitungsstand Checkliste ${x.prog} %. Der Gesamtstatus ist eine rechnerische Zusammenfassung der Feststellungen.</p></div></section>`;
   $("#print").innerHTML=h;
   const prevTitle=document.title; document.title=fileName("pdf").replace(/\.pdf$/,"");
   await Promise.all($$("#print img").map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));
