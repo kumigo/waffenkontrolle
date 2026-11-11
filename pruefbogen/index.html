@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; worker-src 'self'; manifest-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Prüfbogen">
+<meta name="theme-color" content="#1f3a5f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Prüfbogen Ortsbesichtigung</title>
+<style>
+:root{
+  --dark:#1f3a5f; --mid:#d5dee9; --light:#eef2f7; --input:#fffcef; --line:#a6b3c2; --text:#1b1f24; --muted:#5f6b78;
+  --a:#dce9f2; --a-t:#1f3a5f; --b:#f6e6cc; --b-t:#6b4200; --c:#e4dfec; --c-t:#47386b;
+  --ok:#d9ead3; --ok-t:#275317; --bad:#f4cccc; --bad-t:#9c0006; --warn:#fff2cc; --warn-t:#7f6000; --info:#ddebf7;
+  --radius:8px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#f5f7fa;color:var(--text);font:16px/1.4 Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+header.top{position:relative;z-index:20;background:var(--dark);color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+header.top h1{font-size:17px;margin:0;font-weight:bold;flex:1 1 220px}
+header.top .sub{font-size:12px;opacity:.85;display:block;font-weight:normal}
+header.top button{background:#fff;color:var(--dark);border:0;border-radius:6px;padding:9px 12px;font-weight:bold;min-height:42px}
+header.top button.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6)}
+nav.tabs{position:sticky;top:0;z-index:19;background:#fff;border-bottom:1px solid var(--line);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch}
+nav.tabs button{border:0;background:none;padding:12px 14px;white-space:nowrap;border-bottom:4px solid transparent;font-size:15px;min-height:48px;color:var(--muted)}
+nav.tabs button.on{color:var(--dark);font-weight:bold;border-bottom-color:var(--dark)}
+nav.tabs button .p{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+main{max-width:1100px;margin:0 auto;padding:14px 14px 80px}
+.ctx{font-size:13px;color:var(--muted);margin:2px 0 10px}
+.part{padding:7px 12px;border-radius:var(--radius);font-weight:bold;font-size:14px;margin:4px 0 12px}
+.part.A{background:var(--a);color:var(--a-t)} .part.B{background:var(--b);color:var(--b-t)} .part.C{background:var(--c);color:var(--c-t)} .part.N{background:#e7e9ec;color:#333}
+h2{font-size:20px;margin:6px 0 4px;color:var(--dark)}
+h3{font-size:16px;margin:18px 0 8px;padding:7px 10px;background:var(--mid);color:var(--dark);border-radius:6px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px 14px}
+.grid.two{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:bold;color:#33404d}
+label.f.wide{grid-column:1/-1}
+input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{width:100%;border:1px solid var(--line);background:var(--input);border-radius:6px;padding:10px;font-weight:normal;font-size:16px;min-height:44px}
+textarea{min-height:84px;resize:vertical}
+textarea.tall{min-height:150px}
+input:focus,select:focus,textarea:focus{outline:3px solid #9fc3e7;border-color:#2f6fae}
+.calc{background:#f2f2f2;border:1px dashed var(--line);border-radius:6px;padding:10px;white-space:pre-wrap;min-height:44px;font-size:15px}
+.btn{border:1px solid var(--dark);background:#fff;color:var(--dark);border-radius:6px;padding:9px 14px;font-weight:bold;min-height:44px;cursor:pointer}
+.btn.pri{background:var(--dark);color:#fff}
+.btn.danger{border-color:#9c0006;color:#9c0006}
+.btn.sm{min-height:36px;padding:6px 10px;font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.note{font-size:13px;color:var(--muted);font-style:italic;margin:6px 0}
+.box{border-radius:var(--radius);padding:10px 12px;font-size:14px;margin:8px 0}
+.box.B{background:var(--b);color:var(--b-t)} .box.C{background:var(--c);color:var(--c-t)} .box.A{background:var(--a);color:var(--a-t)}
+/* Checkliste */
+.ci{background:#fff;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:8px}
+.ci .h{display:flex;gap:10px;align-items:center;padding:10px;flex-wrap:wrap}
+.ci .nr{font-weight:bold;color:var(--muted);min-width:34px}
+.ci .t{flex:1 1 260px;font-weight:bold}
+.ci .t input{font-weight:bold}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:8px 10px;min-height:44px;min-width:56px;font-size:14px}
+.seg button.on{background:var(--dark);color:#fff;border-color:var(--dark);font-weight:bold}
+.aw{font-size:13px;font-weight:bold;padding:5px 9px;border-radius:12px;white-space:nowrap}
+.aw.ok{background:var(--ok);color:var(--ok-t)} .aw.bad{background:var(--bad);color:var(--bad-t)} .aw.ng{background:var(--warn);color:var(--warn-t)} .aw.offen{background:#ededed;color:#595959} .aw.dok{background:var(--info);color:var(--dark)}
+.ci .more{padding:0 10px 10px;display:none}
+.ci.open .more{display:block}
+.ci .tog{border:0;background:none;color:#2f6fae;font-size:14px;padding:6px;min-height:40px}
+.ci .soll{font-size:12px;color:var(--muted)}
+.ci .soll select{width:auto;min-height:34px;padding:4px 6px;font-size:13px}
+.ci.has .tog{font-weight:bold}
+/* Mängel */
+.mg{border-left:8px solid #c9c9c9}
+.mg.offen{border-left-color:#e3b400;background:#fffdf3}
+.mg.krit{border-left-color:#c00000;background:#fff6f6}
+.mg.erl{border-left-color:#4a8a2a;background:#f6fbf3}
+.overdue{color:#c00000;font-weight:bold}
+/* Übersicht */
+table.t{border-collapse:collapse;width:100%;font-size:14px;background:#fff}
+table.t th{background:var(--dark);color:#fff;padding:7px;text-align:left;font-weight:bold}
+table.t td{border:1px solid var(--line);padding:7px;vertical-align:top}
+table.t td.n{text-align:center}
+table.t tr.sum td{font-weight:bold;background:var(--light)}
+.status{padding:12px;border-radius:var(--radius);font-weight:bold;text-align:center;font-size:16px}
+.status.krit{background:var(--bad);color:var(--bad-t)} .status.abw{background:#fce4d6;color:#843c0c} .status.unv{background:var(--warn);color:var(--warn-t)} .status.ok{background:var(--ok);color:var(--ok-t)} .status.leer{background:#ededed;color:#555}
+.tw{overflow-x:auto}
+/* Bewertung */
+.pv{display:flex;flex-direction:column;gap:8px}
+.pv button{text-align:left;border:2px solid var(--line);background:#fff;border-radius:var(--radius);padding:12px;min-height:52px;font-size:15px}
+.pv button.on.v0{background:var(--ok);border-color:var(--ok-t);color:var(--ok-t);font-weight:bold}
+.pv button.on.v1{background:#fce4d6;border-color:#843c0c;color:#843c0c;font-weight:bold}
+.pv button.on.v2{background:var(--warn);border-color:var(--warn-t);color:var(--warn-t);font-weight:bold}
+.pv button.on.v3{background:var(--bad);border-color:var(--bad-t);color:var(--bad-t);font-weight:bold}
+.plaus{padding:10px;border-radius:6px;font-size:14px}
+.plaus.warn{background:var(--bad);color:var(--bad-t);font-weight:bold}
+.plaus.ok{background:#f2f2f2;color:#333}
+/* Fotos */
+.ph{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.2fr);gap:12px}
+@media (max-width:700px){.ph{grid-template-columns:1fr}}
+.ph img{width:100%;border-radius:6px;border:1px solid var(--line);background:#eee}
+/* Skizze */
+.sk-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+.sk-tools button{min-height:44px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 10px;font-size:14px}
+.sk-tools button.on{background:var(--dark);color:#fff;border-color:var(--dark)}
+.sw{width:30px;height:30px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px var(--line);padding:0!important;min-height:30px!important}
+.sw.on{box-shadow:0 0 0 3px var(--dark)}
+.cwrap{border:2px solid var(--dark);border-radius:6px;background:#fff;touch-action:none;overflow:hidden}
+canvas.sk{display:block;width:100%;height:auto;touch-action:none}
+.legend{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+/* Unterschrift */
+.sig{border:1px solid var(--line);border-radius:6px;background:#fff;touch-action:none}
+.sig canvas{display:block;width:100%;height:150px;touch-action:none}
+.sigline{border-top:1px solid #999;margin:0 12px;font-size:12px;color:var(--muted);padding:2px 0 6px}
+/* Vorgänge */
+.vg{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.vg .i{flex:1 1 260px}
+.vg .i b{display:block}
+.vg .i span{font-size:13px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:50;opacity:0;transition:opacity .25s;pointer-events:none}
+.toast.on{opacity:.92}
+.saved{font-size:12px;opacity:.8}
+#print{display:none}
+/* Druck */
+@media print{
+  @page{size:A4;margin:14mm 12mm 16mm}
+  html,body{background:#fff;font-size:10pt}
+  header.top,nav.tabs,main,.toast{display:none!important}
+  #print{display:block}
+  .pg{page-break-after:always;break-after:page}
+  .pg:last-child{page-break-after:auto;break-after:auto}
+  .pt{background:var(--dark)!important;color:#fff!important;padding:5px 8px;font-weight:bold;font-size:12.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pk{font-size:8pt;font-style:italic;color:#1f3a5f;padding:3px 8px;background:var(--light);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pz{font-weight:bold;font-size:9pt;padding:4px 0}
+  .pp{font-weight:bold;font-size:9pt;padding:3px 8px;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pp.A{background:var(--a)} .pp.B{background:var(--b)} .pp.C{background:var(--c)} .pp.N{background:#e7e9ec}
+  table.p{border-collapse:collapse;width:100%;font-size:8.6pt;margin-bottom:6px}
+  table.p th{background:var(--dark)!important;color:#fff!important;padding:3px 4px;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.p td{border:1px solid #999;padding:3px 4px;vertical-align:top;white-space:pre-wrap}
+  table.p td.l{background:var(--light);font-weight:bold;width:34%;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.p tr.s td{background:var(--mid);font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.p tr{page-break-inside:avoid;break-inside:avoid}
+  .aw,.status,.mgp{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pimg{max-width:100%;max-height:120mm;display:block;margin:0 auto;border:1px solid #999}
+  .ph2{page-break-inside:avoid;break-inside:avoid;margin-bottom:6mm}
+  .sigp{height:22mm;border-bottom:1px solid #333;margin-top:2mm}
+  .sigp img{height:22mm}
+  .pnote{font-size:8pt;font-style:italic;color:#444;margin:4px 0}
+  .status{font-size:10pt;padding:6px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Prüfbogen Ortsbesichtigung § 10 Abs. 5 WaffG<span class="sub" id="hdrSub">Untere Waffenbehörde · Landkreis Jerichower Land</span></h1>
+  <span class="saved" id="savedInfo"></span>
+  <button class="ghost" id="btnList">☰ Vorgänge</button>
+  <button class="ghost" id="btnExport">⬇ Sichern</button>
+  <button id="btnPrint">🖨 Drucken / PDF</button>
+</header>
+<nav class="tabs" id="tabs"></nav>
+<main id="main"></main>
+<div id="print"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileImport" accept=".json,.pruefbogen,application/json" hidden>
+<script>
+"use strict";
+/* ======================================================================
+   Prüfbogen Ortsbesichtigung Wildgatter / Weide – Offline-App
+   Eine einzelne HTML-Datei. Keine Netzwerkzugriffe (CSP), kein Server,
+   keine E-Mail, kein USB. Daten nur im Browser-Speicher dieses Geräts
+   (IndexedDB) bzw. in selbst gespeicherten Sicherungsdateien.
+   ====================================================================== */
+
+const CHECK = [
+  {sec:"Schützenstandort", items:[
+    ["1.1","Standort eindeutig festgelegt","Ja"],
+    ["1.2","Erhöhter Schützenstandort vorhanden","Ja"],
+    ["1.3","Standsicherheit gewährleistet","Ja"],
+    ["1.4","Sichere Waffenhandhabung möglich","Ja"],
+    ["1.5","Schussentfernung ermittelt","Ja"]]},
+  {sec:"Schussrichtung und Kugelfang", items:[
+    ["2.1","Zulässige Schussrichtung festgelegt","Ja"],
+    ["2.2","Geeigneter natürlicher oder künstlicher Kugelfang vorhanden","Ja"],
+    ["2.3","Fehl- und Durchschüsse berücksichtigt","Ja"],
+    ["2.4","Gefahr durch Geschossabpraller geprüft","Ja"],
+    ["2.5","Angrenzende Straßen und Wege berücksichtigt","Ja"],
+    ["2.6","Angrenzende Grundstücke und Gebäude berücksichtigt","Ja"],
+    ["2.7","Gefährdung unbeteiligter Personen ausgeschlossen","Ja"],
+    ["2.8","Keine unzulässigen Schussrichtungen vorhanden","Ja"]]},
+  {sec:"Absicherung", items:[
+    ["3.1","Gefahrenbereich eindeutig festgelegt","Ja"],
+    ["3.2","Absperrmaßnahmen erforderlich","Info"],
+    ["3.3","Absperrmaßnahmen ausreichend","Ja"],
+    ["3.4","Öffentliche Wege betroffen","Info"],
+    ["3.5","Warn- oder Sicherungspersonal erforderlich","Info"],
+    ["3.6","Ausreichende Sichtverhältnisse möglich","Ja"]]},
+  {sec:"Durchführung", items:[
+    ["4.1","Schussentfernung festgelegt","Ja"],
+    ["4.2","Sicherer Standort des Tieres gewährleistet","Ja"],
+    ["4.3","Vorgesehener Ablauf besprochen","Ja"],
+    ["4.4","Abbruchkriterien festgelegt","Ja"],
+    ["4.5","Vorgehen bei Fehl- oder Durchschüssen besprochen","Ja"]]},
+  {sec:"Weitere Prüfpunkte", extra:true, items:[["5.1","",""],["5.2","",""],["5.3","",""],["5.4","",""]]}
+];
+const K = nr => nr.replace(".","_");
+const ERG = ["Ja","Nein","Nicht zutreffend","Nicht geprüft"];
+const ERG_SHORT = {"Ja":"Ja","Nein":"Nein","Nicht zutreffend":"n. z.","Nicht geprüft":"n. gepr."};
+const L = {
+  flaeche:["Wildgatter","Weide","Sonstige Fläche"],
+  tierart:["Damwild","Rotwild","Sikawild","Muffelwild","Schwarzwild","Rind","Wasserbüffel","Bison / Wisent","Schaf","Ziege","Sonstige"],
+  vet:["Ja – vor Ort anwesend","Ja – schriftlich beteiligt","Ja – Beteiligung angefragt","Nein","Nicht erforderlich"],
+  rel:["Kritisch","Hoch","Mittel","Gering"],
+  status:["Offen","In Bearbeitung","Erledigt"],
+  janein:["Ja","Nein"],
+  blick:["N","NO","O","SO","S","SW","W","NW","Senkrecht / Luftbild"],
+  darst:["Handskizze","Lageplan / Liegenschaftskarte","Luftbild","Kombination"],
+  entsch:["Noch offen","Erteilung (mit Auflagen)","Erteilung (ohne Auflagen)","Ablehnung","Antrag zurückgenommen"],
+  vermerk:[
+    "Aus waffenrechtlicher Sicht keine Sicherheitsbedenken festgestellt",
+    "Sicherheitsbedenken bestehen, Nachbesserung erforderlich",
+    "Erneute Ortsbesichtigung erforderlich",
+    "Schießerlaubnis kann aus sicherheitstechnischer Sicht derzeit nicht befürwortet werden"]
+};
+const SK_COLORS = [
+  ["#d0021b","Schützenstandort / Schussrichtung"],
+  ["#8b5a2b","Kugelfang"],
+  ["#2e7d32","Tiere / Bewegungsbereich"],
+  ["#777777","Straßen und Wege"],
+  ["#222222","Gebäude und Grundstücke"],
+  ["#ef6c00","Gefahrenbereich"],
+  ["#1565c0","Absperrungen"]
+];
+const SK_LEG = [
+  ["schuetze","Schützenstandort","S – Dreieck rot"],
+  ["richtung","Zulässige Schussrichtung","Pfeil rot"],
+  ["kugelfang","Kugelfang","K – braun"],
+  ["tiere","Standort / Bewegungsbereich der Tiere","T – grün"],
+  ["wege","Angrenzende Straßen und Wege","Linie grau"],
+  ["gebaeude","Gebäude und Grundstücke","schwarz"],
+  ["gefahr","Gefahrenbereich","orange"],
+  ["absperr","Absperrungen","Linie blau"],
+  ["entf","Schussentfernung","Maßlinie mit m-Angabe"]
+];
+const TABS = [
+  ["deck","1 Deckblatt","A"],["check","2 Checkliste","A"],["skizze","3 Skizze","A"],["fotos","4 Fotos","A"],
+  ["maengel","5 Mängel","A"],["uebersicht","Übersicht","A"],["fest","6 Festlegungen","B"],
+  ["bew","7 Bewertung","B"],["sig","8 Unterschriften","N"]
+];
+const PART_COL = {A:"#2e6b8a",B:"#b07d2b",C:"#6b5a8e",N:"#888"};
+const PART_TXT = {A:"Teil A – Dokumentierte Feststellungen",B:"Teil B – Fachliche Sicherheitsbewertung",C:"Teil C – Behördliche Entscheidung (gesonderter Bescheid)",N:"Unterschriften"};
+
+/* ---------------------------------------------------------------- Helfer */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const today = ()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const dDE = s => { if(!s) return ""; const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m? m[3]+"."+m[2]+"."+m[1] : s; };
+function getP(o,p){return p.split(".").reduce((a,k)=>a==null?undefined:a[k],o)}
+function setP(o,p,v){const ks=p.split(".");let a=o;for(let i=0;i<ks.length-1;i++){if(a[ks[i]]==null||typeof a[ks[i]]!=="object")a[ks[i]]={};a=a[ks[i]]}a[ks[ks.length-1]]=v}
+function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");clearTimeout(toast._t);toast._t=setTimeout(()=>e.classList.remove("on"),2200)}
+
+/* ---------------------------------------------------------------- Speicher (IndexedDB, nur lokal) */
+const DB = {
+  db:null, ok:false, mem:new Map(),
+  open(){return new Promise(res=>{
+    try{
+      const r=indexedDB.open("pruefbogen-ortsbesichtigung",1);
+      r.onupgradeneeded=()=>r.result.createObjectStore("v",{keyPath:"id"});
+      r.onsuccess=()=>{this.db=r.result;this.ok=true;res()};
+      r.onerror=()=>res();
+    }catch(e){res()}
+  })},
+  req(mode,fn){return new Promise((res,rej)=>{const q=fn(this.db.transaction("v",mode).objectStore("v"));q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  async all(){return this.ok? this.req("readonly",s=>s.getAll()) : Array.from(this.mem.values())},
+  async put(o){if(this.ok) return this.req("readwrite",s=>s.put(o)); this.mem.set(o.id,o)},
+  async del(id){if(this.ok) return this.req("readwrite",s=>s.delete(id)); this.mem.delete(id)}
+};
+
+function blank(){
+  return {id:uid(),created:new Date().toISOString(),updated:new Date().toISOString(),
+    deck:{datum:today()},check:{},skizze:{items:[],bg:null,legend:{}},fotos:[],maengel:[],fest:{},bew:{},sig:{datum:today()}};
+}
+let S = null;          // aktueller Vorgang
+let TAB = "deck";
+let saveT = null;
+function touch(){ if(!S) return; S.updated=new Date().toISOString(); clearTimeout(saveT); saveT=setTimeout(save,400); $("#savedInfo").textContent="…"; }
+async function save(){
+  if(!S) return;
+  try{ await DB.put(JSON.parse(JSON.stringify(S))); $("#savedInfo").textContent = DB.ok? "✓ gespeichert" : "⚠ nur vorläufig – bitte sichern"; }
+  catch(e){ $("#savedInfo").textContent="⚠ Speichern fehlgeschlagen"; toast("Speichern fehlgeschlagen: "+e.message+" – bitte „Sichern“ verwenden."); }
+}
+
+/* ---------------------------------------------------------------- Auswertung */
+function itemsAll(s){
+  const out=[];
+  CHECK.forEach(sec=>sec.items.forEach(([nr,text,soll])=>{
+    const r=s.check[K(nr)]||{};
+    const t = sec.extra? (r.text||"") : text;
+    const so = r.soll!==undefined && r.soll!=="" ? r.soll : soll;
+    out.push({nr,text:t,soll:so,sec:sec.sec,extra:!!sec.extra,r});
+  }));
+  return out;
+}
+function ausw(it){
+  if(!it.text) return "";
+  const e=it.r.e;
+  if(!e) return "offen";
+  if(e==="Nicht geprüft") return "nicht geprüft";
+  if(!it.soll || it.soll==="Info" || e==="Nicht zutreffend") return "dokumentiert";
+  return e===it.soll? "i. O." : "Abweichung";
+}
+const AW_CLS = {"i. O.":"ok","Abweichung":"bad","nicht geprüft":"ng","offen":"offen","dokumentiert":"dok"};
+function mStatus(m){ return m.status||"Offen"; }
+function mOpen(m){ return m.mangel && mStatus(m)!=="Erledigt"; }
+function mOverdue(m){ return mOpen(m) && m.frist && m.frist < today(); }
+function summary(s){
+  const its=itemsAll(s).filter(i=>i.text);
+  const secs=CHECK.map(c=>{
+    const l=its.filter(i=>i.sec===c.sec);
+    const cnt=v=>l.filter(i=>i.r.e===v).length;
+    return {sec:c.sec,n:l.length,ja:cnt("Ja"),nein:cnt("Nein"),nz:cnt("Nicht zutreffend"),ng:cnt("Nicht geprüft"),
+      offen:l.filter(i=>ausw(i)==="offen").length,abw:l.filter(i=>ausw(i)==="Abweichung").length};
+  });
+  const tot={sec:"Gesamt"}; ["n","ja","nein","nz","ng","offen","abw"].forEach(k=>tot[k]=secs.reduce((a,b)=>a+b[k],0));
+  const ms=s.maengel.filter(m=>m.mangel);
+  const M={ges:ms.length,offen:ms.filter(mOpen).length,erl:ms.filter(m=>mStatus(m)==="Erledigt").length,
+    krit:ms.filter(m=>mOpen(m)&&m.rel==="Kritisch").length,ueber:ms.filter(mOverdue).length,nk:ms.filter(m=>m.nk==="Ja").length};
+  let st,cls;
+  if(tot.n===0){st="Keine Prüfpunkte erfasst";cls="leer"}
+  else if(M.krit>0){st=`KRITISCH: ${M.krit} kritische(r) Mangel/Mängel offen`;cls="krit"}
+  else if(tot.abw>0||M.offen>0){st=`ABWEICHUNGEN: ${tot.abw} Abweichung(en) vom Soll, ${M.offen} offene(r) Mangel/Mängel`;cls="abw"}
+  else if(tot.ng>0||tot.offen>0){st=`UNVOLLSTÄNDIG: ${tot.ng+tot.offen} Prüfpunkt(e) nicht geprüft oder unbeantwortet`;cls="unv"}
+  else {st="Keine Abweichungen und keine offenen Mängel dokumentiert";cls="ok"}
+  const prog = tot.n? Math.round((tot.n-tot.offen)/tot.n*100) : 0;
+  const auff = its.filter(i=>["Abweichung","nicht geprüft"].includes(ausw(i)));
+  return {secs,tot,M,st,cls,prog,auff};
+}
+function draft(f){
+  const parts=[];
+  if(f.standort) parts.push("• Die Schussabgabe ist ausschließlich von folgendem Schützenstandort zulässig: "+f.standort);
+  if(f.richtung) parts.push("• Zulässige Schussrichtung: "+f.richtung+". Schussabgaben in andere Richtungen sind unzulässig.");
+  if(f.entf) parts.push("• Die Schussentfernung darf "+f.entf+" m nicht überschreiten.");
+  if(f.kugelfang) parts.push("• Kugelfang: "+f.kugelfang);
+  if(f.absperr) parts.push("• Absperrmaßnahmen: "+f.absperr);
+  if(f.auflagen) parts.push("• Besondere Sicherheitsauflagen: "+f.auflagen);
+  if(f.sonst) parts.push("• Sonstige Einschränkungen: "+f.sonst);
+  return parts.length? parts.join("\n") : "(Noch keine Festlegungen erfasst.)";
+}
+function plaus(s){
+  const v=s.bew.vermerk, x=summary(s);
+  if(!v) return {t:"Bitte Prüfvermerk auswählen.",w:false};
+  if(v===L.vermerk[0] && (x.M.krit>0||x.tot.abw>0||x.M.offen>0||x.tot.ng>0||x.tot.offen>0))
+    return {t:"Achtung: Der Prüfvermerk „keine Sicherheitsbedenken“ steht im Widerspruch zu dokumentierten Abweichungen, offenen Mängeln oder nicht geprüften Punkten. Bitte Begründung ergänzen bzw. Feststellungen prüfen.",w:true};
+  return {t:"Keine Widersprüche zwischen Prüfvermerk und dokumentierten Feststellungen erkannt.",w:false};
+}
+
+/* ---------------------------------------------------------------- Formular-Bausteine */
+function fText(label,path,o={}){
+  const v=getP(S,path)??"";
+  const cls="f"+(o.wide?" wide":"");
+  if(o.area) return `<label class="${cls}"><span>${esc(label)}</span><textarea data-k="${path}" class="${o.tall?"tall":""}" placeholder="${esc(o.ph||"")}">${esc(v)}</textarea></label>`;
+  const type=o.type||"text";
+  const extra = type==="number"? ' inputmode="decimal" min="0" step="any"' : "";
+  const list = o.list? ` list="dl_${o.list}"` : "";
+  return `<label class="${cls}"><span>${esc(label)}</span><input type="${type}" data-k="${path}" value="${esc(v)}"${extra}${list} placeholder="${esc(o.ph||"")}" autocomplete="off"></label>`;
+}
+function fSel(label,path,opts,o={}){
+  const v=getP(S,path)??"";
+  return `<label class="f${o.wide?" wide":""}"><span>${esc(label)}</span><select data-k="${path}"><option value="">– bitte wählen –</option>${opts.map(x=>`<option${x===v?" selected":""}>${esc(x)}</option>`).join("")}</select></label>`;
+}
+function datalists(){
+  return Object.entries({tierart:L.tierart,blick:L.blick}).map(([k,a])=>`<datalist id="dl_${k}">${a.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`).join("");
+}
+function part(p){return `<div class="part ${p}">${PART_TXT[p]}</div>`}
+function ctxLine(){
+  const d=S.deck;
+  return `<div class="ctx">Az.: <b>${esc(d.az||"—")}</b> · Ortsbesichtigung am <b>${esc(dDE(d.datum)||"—")}</b> · Fläche: <b>${esc(d.standort||"—")}</b></div>`;
+}
+
+/* ---------------------------------------------------------------- Ansichten */
+const VIEWS = {};
+VIEWS.deck = ()=> `${part("A")}<h2>1. Allgemeine Angaben</h2>${ctxLine()}
+<h3>Verfahren</h3><div class="grid">
+${fText("Aktenzeichen","deck.az")}${fSel("Art der Fläche","deck.flaeche",L.flaeche)}
+${fText("Datum der Ortsbesichtigung","deck.datum",{type:"date"})}
+<div class="grid two" style="gap:10px">${fText("Uhrzeit Beginn","deck.von",{type:"time"})}${fText("Uhrzeit Ende","deck.bis",{type:"time"})}</div>
+</div>
+<h3>Antragsteller und Schütze</h3><div class="grid">
+${fText("Name des Antragstellers","deck.antName")}${fText("Name des Schützen","deck.schuetze")}
+${fText("Anschrift des Antragstellers","deck.antAnschrift",{area:true})}
+${fText("Waffenrechtliche Erlaubnis des Schützen (Art, Nummer, Behörde)","deck.erlaubnis",{area:true})}
+</div>
+<h3>Örtlichkeit</h3><div class="grid">
+${fText("Standort des Gatters / der Weide (Bezeichnung, Lage)","deck.standort",{wide:true})}
+${fText("Gemarkung","deck.gemarkung")}${fText("Flur","deck.flur")}${fText("Flurstück(e)","deck.flurstueck")}${fText("Koordinaten (optional)","deck.koord")}
+</div>
+<h3>Tiere und geplante Durchführung</h3><div class="grid">
+${fText("Tierart","deck.tierart",{list:"tierart",ph:"auswählen oder eintippen"})}${fText("Anzahl der Tiere","deck.anzahl",{type:"number"})}
+${fText("davon zur Erlegung vorgesehen","deck.erlegung",{type:"number"})}${fText("Geplantes Datum der Schussabgabe","deck.schussDatum",{type:"date"})}
+</div>
+<h3>Beteiligte</h3><div class="grid">
+${fText("Teilnehmende Personen (Name, Funktion)","deck.teilnehmer",{area:true,tall:true})}
+${fText("Zuständige Sachbearbeiter der Waffenbehörde","deck.sachbearbeiter",{area:true})}
+${fSel("Beteiligung des Veterinäramtes","deck.vet",L.vet)}${fText("Vertreter / Stellungnahme Veterinäramt","deck.vetName",{area:true})}
+</div>
+<div class="box A">Gliederung: <b>Teil A</b> Dokumentierte Feststellungen (Blätter 1–5, Übersicht) · <b>Teil B</b> Fachliche Sicherheitsbewertung (6, 7) · <b>Teil C</b> Behördliche Entscheidung – erfolgt ausschließlich durch gesonderten Bescheid.</div>`;
+
+VIEWS.check = ()=>{
+  let h=`${part("A")}<h2>2. Checkliste zur Ortsbesichtigung</h2>${ctxLine()}
+  <p class="note">Antwort antippen. „Details“ öffnet Bemerkungen, festgestellten Mangel und erforderliche Maßnahme. Soll = sicherheitstechnisch erwartete Antwort, „Info“ = reine Sachverhaltsangabe.</p>`;
+  CHECK.forEach((sec,si)=>{
+    h+=`<h3>${si+1}. ${esc(sec.sec)}</h3>`;
+    sec.items.forEach(([nr,text,soll])=>{ h+=ciHTML(nr); });
+  });
+  return h;
+};
+function ciHTML(nr){
+  const it=itemsAll(S).find(i=>i.nr===nr), r=it.r, a=ausw(it);
+  const has = r.bem||r.mangel||r.mass;
+  const sollSel = `<span class="soll">Soll: <select data-k="check.${K(nr)}.soll">${(it.extra?[""]:[]).concat(["Ja","Nein","Info"]).map(x=>`<option value="${x}"${x===it.soll?" selected":""}>${x||"–"}</option>`).join("")}</select></span>`;
+  return `<div class="ci${has?" has":""}" data-ci="${nr}">
+  <div class="h"><span class="nr">${nr}</span>
+    <span class="t">${it.extra? `<input type="text" data-k="check.${K(nr)}.text" value="${esc(r.text||"")}" placeholder="Weiteren Prüfpunkt eintragen">` : esc(it.text)}</span>
+    ${sollSel}
+    <span class="seg">${ERG.map(e=>`<button data-erg="${esc(e)}" class="${r.e===e?"on":""}">${ERG_SHORT[e]}</button>`).join("")}</span>
+    <span class="aw ${AW_CLS[a]||""}" data-aw="${nr}">${esc(a)}</span>
+    <button class="tog" data-tog="1">${has?"● ":""}Details</button>
+  </div>
+  <div class="more"><div class="grid">
+    ${fText("Bemerkungen",`check.${K(nr)}.bem`,{area:true})}
+    ${fText("Festgestellter Mangel",`check.${K(nr)}.mangel`,{area:true})}
+    ${fText("Erforderliche Maßnahme",`check.${K(nr)}.mass`,{area:true})}
+  </div><div class="row" style="margin-top:8px"><button class="btn sm" data-tomangel="${nr}">➜ In Mängelliste übernehmen</button></div></div>
+</div>`;
+}
+
+VIEWS.skizze = ()=> {
+  const sk=S.skizze;
+  return `${part("A")}<h2>3. Skizze und Lageplan</h2>${ctxLine()}
+<div class="grid">${fSel("Art der Darstellung","skizze.art",L.darst)}${fText("Maßstab (ca.)","skizze.massstab")}
+${fText("Nordrichtung / Ausrichtung","skizze.nord")}${fText("Quelle / Nutzungshinweis Kartengrundlage","skizze.quelle")}</div>
+<h3>Zeichenfläche</h3>
+<div class="sk-tools" id="skTools">
+  <button data-tool="pen" class="on">✎ Freihand</button><button data-tool="arrow">➜ Pfeil</button><button data-tool="line">↔ Maßlinie</button>
+  <button data-tool="stamp" data-s="S">S</button><button data-tool="stamp" data-s="K">K</button><button data-tool="stamp" data-s="T">T</button><button data-tool="stamp" data-s="N ↑">N↑</button><button data-tool="text">T Text…</button>
+  <span style="width:8px"></span>
+  ${SK_COLORS.map(([c,t],i)=>`<button class="sw${i===0?" on":""}" data-col="${c}" title="${esc(t)}" style="background:${c}"></button>`).join("")}
+  <span style="width:8px"></span>
+  <button data-act="undo">↶ Rückgängig</button><button data-act="bg">🖼 Hintergrund (Foto/Lageplan)</button>
+  ${sk.bg?'<button data-act="bgdel">Hintergrund entfernen</button>':""}<button data-act="clear">Alles löschen</button>
+</div>
+<div class="legend">${SK_COLORS.map(([c,t])=>`<span><i style="background:${c}"></i>${esc(t)}</span>`).join("")}</div>
+<div class="cwrap"><canvas class="sk" id="skCanvas" width="1600" height="1100"></canvas></div>
+<input type="file" id="skBg" accept="image/*" hidden>
+<p class="note">Mit dem Finger oder Stift zeichnen. Pfeil = Schussrichtung, Maßlinie fragt nach der Entfernung in Metern. Ein Foto oder Luftbild kann als Hintergrund dienen. Die Kopfzeile ordnet die Skizze diesem Prüfprotokoll zu.</p>
+<h3>Legende und Angaben zur Skizze</h3>
+<div class="tw"><table class="t"><tr><th style="width:30%">Element</th><th style="width:25%">Darstellung</th><th>Beschreibung / Wert</th></tr>
+${SK_LEG.map(([k,l,d])=>`<tr><td><b>${esc(l)}</b></td><td><input type="text" data-k="skizze.legend.${k}.sym" value="${esc(getP(S,`skizze.legend.${k}.sym`)??d)}"></td><td><input type="text" data-k="skizze.legend.${k}.wert" value="${esc(getP(S,`skizze.legend.${k}.wert`)||"")}"></td></tr>`).join("")}
+</table></div>`;
+};
+
+VIEWS.fotos = ()=> `${part("A")}<h2>4. Fotodokumentation</h2>${ctxLine()}
+<div class="row"><label class="btn pri">📷 Foto aufnehmen<input type="file" accept="image/*" capture="environment" id="phCam" hidden></label>
+<label class="btn">🖼 Aus Galerie wählen<input type="file" accept="image/*" multiple id="phGal" hidden></label></div>
+<p class="note">Fotos werden verkleinert und ohne Standort-/Kameradaten (EXIF) gespeichert. Auf Fotos möglichst keine unbeteiligten Personen oder Kfz-Kennzeichen abbilden.</p>
+${S.fotos.length? "" : '<div class="card note">Noch keine Fotos.</div>'}
+${S.fotos.map((p,i)=>`<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:8px"><b>Bild ${i+1}</b>
+<span class="row"><button class="btn sm" data-phmove="${i}" data-dir="-1" ${i===0?"disabled":""}>▲</button><button class="btn sm" data-phmove="${i}" data-dir="1" ${i===S.fotos.length-1?"disabled":""}>▼</button><button class="btn sm danger" data-phdel="${i}">Löschen</button></span></div>
+<div class="ph"><img src="${p.img}" alt="Bild ${i+1}"><div class="grid two">
+${fText("Datum der Aufnahme",`fotos.${i}.datum`,{type:"date"})}${fText("Blickrichtung",`fotos.${i}.blick`,{list:"blick"})}
+${fText("Aufnahmeort",`fotos.${i}.ort`,{wide:true})}
+${fText("Beschreibung",`fotos.${i}.beschr`,{area:true,wide:true})}
+${fText("Festgestellte Sicherheitsmängel",`fotos.${i}.maengel`,{area:true,wide:true})}
+</div></div></div>`).join("")}`;
+
+function mCls(m){ if(!m.mangel) return ""; if(mStatus(m)==="Erledigt") return "erl"; if(m.rel==="Kritisch") return "krit"; return "offen"; }
+VIEWS.maengel = ()=> `${part("A")}<h2>5. Festgestellte Mängel und Maßnahmen</h2>${ctxLine()}
+<div class="legend"><span><i style="background:#c00000"></i>kritisch, nicht erledigt</span><span><i style="background:#e3b400"></i>offen / in Bearbeitung</span><span><i style="background:#4a8a2a"></i>erledigt</span><span class="overdue">Frist überschritten</span></div>
+${S.maengel.map((m,i)=>`<div class="card mg ${mCls(m)}" data-mrow="${i}">
+<div class="row" style="justify-content:space-between;margin-bottom:6px"><b>Lfd. Nr. ${i+1}</b> <span class="overdue" data-od="${i}">${mOverdue(m)?"Frist überschritten":""}</span><button class="btn sm danger" data-mdel="${i}">Löschen</button></div>
+<div class="grid">
+${fText("Festgestellter Mangel",`maengel.${i}.mangel`,{area:true})}
+${fText("Erforderliche Maßnahme",`maengel.${i}.mass`,{area:true})}
+${fSel("Sicherheitsrelevanz",`maengel.${i}.rel`,L.rel)}${fText("Verantwortliche Person",`maengel.${i}.verantw`)}
+${fText("Frist",`maengel.${i}.frist`,{type:"date"})}${fText("Erledigungsdatum",`maengel.${i}.erl`,{type:"date"})}
+${fSel("Status",`maengel.${i}.status`,L.status)}${fSel("Nachkontrolle erforderlich",`maengel.${i}.nk`,L.janein)}
+</div></div>`).join("")}
+<button class="btn pri" id="mAdd">＋ Mangel hinzufügen</button>
+<p class="note">Ein Mangel gilt als offen, solange der Status nicht „Erledigt“ ist. Offene Mängel erscheinen automatisch in der Übersicht.</p>`;
+
+VIEWS.uebersicht = ()=>{
+  const x=summary(S);
+  const om=S.maengel.map((m,i)=>({m,i})).filter(o=>mOpen(o.m));
+  return `${part("A")}<h2>Automatische Zusammenfassung der Prüfergebnisse</h2>${ctxLine()}
+<div class="status ${x.cls}">${esc(x.st)}</div>
+<p class="note">Der Gesamtstatus fasst die dokumentierten Feststellungen rechnerisch zusammen. Er ist weder eine fachliche Sicherheitsbewertung (Teil B) noch eine behördliche Entscheidung (Teil C).</p>
+<h3>Checkliste nach Bereichen</h3><div class="tw"><table class="t"><tr><th>Bereich</th><th>Prüfpunkte</th><th>Ja</th><th>Nein</th><th>n. z.</th><th>n. gepr.</th><th>Unbeantw.</th><th>Abweichungen</th></tr>
+${x.secs.concat([x.tot]).map(r=>`<tr class="${r.sec==="Gesamt"?"sum":""}"><td>${esc(r.sec)}</td>${["n","ja","nein","nz","ng","offen","abw"].map(k=>`<td class="n">${r[k]}</td>`).join("")}</tr>`).join("")}
+</table></div><p>Bearbeitungsstand Checkliste: <b>${x.prog} %</b></p>
+<h3>Mängel</h3><div class="tw"><table class="t">
+<tr><td>Mängel gesamt</td><td class="n"><b>${x.M.ges}</b></td></tr><tr><td>davon offen / in Bearbeitung</td><td class="n"><b>${x.M.offen}</b></td></tr>
+<tr><td>davon erledigt</td><td class="n"><b>${x.M.erl}</b></td></tr><tr><td>Kritische Mängel, nicht erledigt</td><td class="n"><b>${x.M.krit}</b></td></tr>
+<tr><td>Offene Mängel mit überschrittener Frist</td><td class="n"><b>${x.M.ueber}</b></td></tr><tr><td>Nachkontrolle erforderlich</td><td class="n"><b>${x.M.nk}</b></td></tr></table></div>
+<h3>Abweichungen und nicht geprüfte Punkte aus der Checkliste</h3>
+${x.auff.length? `<div class="tw"><table class="t"><tr><th>Nr. / Prüfpunkt</th><th>Ergebnis</th><th>Auswertung</th><th>Mangel / Bemerkung</th></tr>${x.auff.map(i=>`<tr><td>${i.nr} ${esc(i.text)}</td><td>${esc(i.r.e)}</td><td><span class="aw ${AW_CLS[ausw(i)]}">${ausw(i)}</span></td><td>${esc(i.r.mangel||i.r.bem||"")}</td></tr>`).join("")}</table></div>` : '<p class="note">Keine.</p>'}
+<h3>Offene Mängel</h3>
+${om.length? `<div class="tw"><table class="t"><tr><th>Nr. / Mangel</th><th>Relevanz</th><th>Frist</th><th>Status</th><th>Maßnahme</th><th>Verantwortlich</th></tr>${om.map(({m,i})=>`<tr style="background:${m.rel==="Kritisch"?"var(--bad)":"var(--warn)"}"><td>${i+1}. ${esc(m.mangel)}</td><td>${esc(m.rel||"")}</td><td class="${mOverdue(m)?"overdue":""}">${esc(dDE(m.frist))}</td><td>${esc(mStatus(m))}</td><td>${esc(m.mass||"")}</td><td>${esc(m.verantw||"")}</td></tr>`).join("")}</table></div>` : '<p class="note">Keine offenen Mängel.</p>'}`;
+};
+
+VIEWS.fest = ()=> `${part("B")}<h2>6. Festlegungen für die Schießerlaubnis</h2>${ctxLine()}
+<div class="box B">Örtliche Festlegungen aus fachlicher Sicht als Grundlage für den späteren Bescheid. Sie werden erst durch den Bescheid rechtsverbindlich.</div>
+<div class="grid">
+${fText("Zulässiger Schützenstandort","fest.standort",{area:true})}${fText("Zulässige Schussrichtung","fest.richtung",{area:true})}
+${fText("Zulässige maximale Schussentfernung (m)","fest.entf",{type:"number"})}${fText("Anforderungen an den Kugelfang","fest.kugelfang",{area:true})}
+${fText("Erforderliche Absperrmaßnahmen","fest.absperr",{area:true})}${fText("Besondere Sicherheitsauflagen","fest.auflagen",{area:true})}
+${fText("Sonstige Einschränkungen","fest.sonst",{area:true,wide:true})}
+</div>
+<h3>Automatischer Textentwurf der Sicherheitsauflagen</h3>
+<div class="calc" data-calc="draft">${esc(draft(S.fest))}</div>
+<div class="row" style="margin-top:8px"><button class="btn" id="draftCopy">Entwurf in Freitext übernehmen</button></div>
+<h3>Redaktionell überarbeitete Fassung (zur Übernahme in den Bescheid)</h3>
+${fText("","fest.final",{area:true,tall:true})}`;
+
+VIEWS.bew = ()=>{
+  const x=summary(S), p=plaus(S);
+  return `${part("B")}<h2>7. Abschließende Bewertung (Prüfvermerk)</h2>${ctxLine()}
+<h3 style="background:var(--a);color:var(--a-t)">Grundlage: Dokumentierte Feststellungen (Teil A) – automatisch</h3>
+<div class="tw"><table class="t">
+<tr><td>Prüfpunkte gesamt / Bearbeitungsstand</td><td class="n">${x.tot.n} / ${x.prog} %</td></tr>
+<tr><td>Abweichungen vom Soll</td><td class="n">${x.tot.abw}</td></tr><tr><td>Nicht geprüft / unbeantwortet</td><td class="n">${x.tot.ng} / ${x.tot.offen}</td></tr>
+<tr><td>Offene Mängel / davon kritisch</td><td class="n">${x.M.offen} / ${x.M.krit}</td></tr></table></div>
+<div class="status ${x.cls}" style="margin-top:8px">${esc(x.st)}</div>
+<h3 style="background:var(--b);color:var(--b-t)">Teil B – Fachliche Sicherheitsbewertung</h3>
+<div class="pv">${L.vermerk.map((v,i)=>`<button class="v${i}${S.bew.vermerk===v?" on":""}" data-vermerk="${i}">${S.bew.vermerk===v?"◉":"○"} ${esc(v)}</button>`).join("")}</div>
+<div class="plaus ${p.w?"warn":"ok"}" data-calc="plaus" style="margin-top:10px">${esc(p.t)}</div>
+<div class="grid" style="margin-top:10px">
+${fText("Begründung","bew.begr",{area:true,tall:true,wide:true})}
+${fText("Offene Punkte","bew.offen",{area:true})}
+${fText("Weitere erforderliche Prüfungen","bew.weitere",{area:true,ph:"z. B. Veterinäramt / Tierschutz, Zustimmung Grundstückseigentümer, Straßenverkehrsbehörde, Naturschutz"})}
+</div>
+<div class="box B">Der Prüfvermerk ist eine fachliche Stellungnahme zur Sicherheit der Schussabgabe. Er ersetzt nicht die rechtliche Prüfung und Entscheidung über den Antrag (z. B. Bedürfnis, Zuverlässigkeit, Sachkunde, tierschutzrechtliche Belange) und begründet keinen Anspruch auf Erteilung.</div>
+<h3 style="background:var(--c);color:var(--c-t)">Teil C – Behördliche Entscheidung (nur Verweis)</h3>
+<div class="box C">Über den Antrag entscheidet die untere Waffenbehörde ausschließlich durch schriftlichen Bescheid. Diese Felder verweisen nur auf die Entscheidung und werden nicht automatisch befüllt.</div>
+<div class="grid">${fSel("Stand der Entscheidung","bew.entsch",L.entsch)}${fText("Datum des Bescheids","bew.bDatum",{type:"date"})}
+${fText("Aktenzeichen / Bezug des Bescheids","bew.bAz")}${fText("Entscheidung gezeichnet durch","bew.bDurch")}</div>`;
+};
+
+function sigBlock(key,title,text){
+  const v=S.sig[key]||{};
+  return `<h3>${esc(title)}</h3>${text?`<div class="box" style="background:var(--light)">${esc(text)}</div>`:""}
+<div class="grid">${fText("Name (Druckbuchstaben)",`sig.${key}.name`)}</div>
+<div style="margin-top:8px" class="sig"><canvas data-sig="${key}" width="900" height="225"></canvas><div class="sigline">Unterschrift</div></div>
+<div class="row" style="margin-top:6px"><button class="btn sm" data-sigclr="${key}">Unterschrift löschen</button>${v.img?'<span class="note">✓ Unterschrift gespeichert</span>':""}</div>`;
+}
+VIEWS.sig = ()=> `${part("N")}<h2>8. Unterschriften</h2>${ctxLine()}
+<div class="grid">${fText("Ort","sig.ort")}${fText("Datum","sig.datum",{type:"date"})}</div>
+${sigBlock("p1","Prüfender Mitarbeiter der unteren Waffenbehörde")}
+${sigBlock("p2","Weiterer Mitarbeiter der unteren Waffenbehörde")}
+${sigBlock("ant","Antragsteller – Bestätigung der besprochenen örtlichen Festlegungen","Mit meiner Unterschrift bestätige ich, dass mir die vor Ort besprochenen örtlichen Festlegungen (insbesondere Schützenstandort, Schussrichtung, maximale Schussentfernung, Kugelfang und Absperrmaßnahmen – siehe Festlegungen) erläutert wurden. Diese Bestätigung ist keine Genehmigung; über den Antrag wird gesondert durch Bescheid entschieden.")}
+<div class="grid" style="margin-top:10px">${fSel("Datenschutzinformation nach Art. 13 DSGVO ausgehändigt","sig.art13",L.janein)}</div>`;
+
+/* ---------------------------------------------------------------- Vorgangsliste */
+async function showList(){
+  TAB=null; renderTabs();
+  const all=(await DB.all()).sort((a,b)=>(b.updated||"").localeCompare(a.updated||""));
+  $("#main").innerHTML=`${part("N").replace("Unterschriften","Vorgänge auf diesem Gerät")}
+<div class="row" style="margin-bottom:12px"><button class="btn pri" id="vNew">＋ Neuer Prüfbogen</button><button class="btn" id="vImp">⬆ Sicherung öffnen</button></div>
+${all.length? all.map(v=>`<div class="card vg"><div class="i"><b>${esc(v.deck.az||"(ohne Aktenzeichen)")} – ${esc(v.deck.standort||"ohne Flächenangabe")}</b>
+<span>Besichtigung ${esc(dDE(v.deck.datum)||"—")} · ${v.fotos.length} Foto(s) · ${v.maengel.filter(m=>m.mangel).length} Mangel/Mängel · zuletzt geändert ${new Date(v.updated).toLocaleString("de-DE")}</span></div>
+<button class="btn pri" data-vopen="${v.id}">Öffnen</button><button class="btn" data-vcopy="${v.id}" title="Neuer Vorgang für dieselbe Fläche">Kopie für gleiche Fläche</button><button class="btn danger" data-vdel="${v.id}">Löschen</button></div>`).join("") : '<div class="card note">Noch keine Prüfbögen auf diesem Gerät.</div>'}
+<h3>Datenschutz und Sicherheit</h3>
+<div class="card" style="font-size:14px">
+<p>Diese App arbeitet vollständig <b>offline</b>. Die Webseite liefert nur das leere Programm; Netzwerkzugriffe der App sind technisch gesperrt. Es gibt keinen Server für Daten, keine E-Mail-Funktion und keinen USB-Bedarf.${navigator.serviceWorker&&navigator.serviceWorker.controller?' <b style="color:#275317">✓ Auf diesem Gerät offline verfügbar.</b>':''}</p>
+<p>Prüfbögen werden nur im Browser-Speicher <b>dieses Geräts</b> abgelegt. „Sichern“ speichert den Vorgang zusätzlich als Datei, z. B. zur Übernahme in die Akte über die dienstlich zugelassenen Wege. Browserdaten nicht löschen, solange Vorgänge nicht gesichert sind.</p>
+<p>Fotos werden ohne Standort- und Kameradaten gespeichert. Nur die für die Prüfung erforderlichen Daten erfassen. Abgeschlossene Vorgänge nach Übernahme in die Akte hier löschen.</p>
+${DB.ok?"":'<p class="overdue">Hinweis: Dieser Browser erlaubt hier keinen dauerhaften Speicher. Bitte jeden Vorgang mit „Sichern“ als Datei speichern.</p>'}
+</div>`;
+}
+async function openV(id){
+  const all=await DB.all(); const v=all.find(x=>x.id===id); if(!v) return;
+  S=migrate(v); TAB="deck"; render();
+}
+function migrate(v){
+  const b=blank(); const o=Object.assign(b,v);
+  ["deck","check","fest","bew","sig"].forEach(k=>{o[k]=o[k]||{}});
+  o.skizze=Object.assign({items:[],bg:null,legend:{}},o.skizze||{});
+  o.fotos=o.fotos||[]; o.maengel=o.maengel||[];
+  return o;
+}
+
+/* ---------------------------------------------------------------- Render */
+function renderTabs(){
+  $("#tabs").innerHTML = S && TAB? TABS.map(([k,l,p])=>`<button data-tab="${k}" class="${k===TAB?"on":""}"><span class="p" style="background:${PART_COL[p]}"></span>${l}</button>`).join("") : "";
+  $("#tabs").style.display = S && TAB? "flex":"none";
+  $("#hdrSub").textContent = S && TAB? `Az.: ${S.deck.az||"—"} · ${S.deck.standort||"Fläche —"}` : "Untere Waffenbehörde · Landkreis Jerichower Land";
+  $("#btnPrint").style.display = $("#btnExport").style.display = S && TAB? "":"none";
+}
+function render(){
+  renderTabs();
+  $("#main").innerHTML = VIEWS[TAB]() + datalists();
+  if(TAB==="skizze") initSketch();
+  if(TAB==="sig") initSigs();
+  window.scrollTo(0,0);
+}
+function updateCalc(path){
+  if(path.startsWith("deck.")){ const tmp=document.createElement("div"); tmp.innerHTML=ctxLine(); $$(".ctx").forEach(e=>e.innerHTML=tmp.firstChild.innerHTML); $("#hdrSub").textContent=`Az.: ${S.deck.az||"—"} · ${S.deck.standort||"Fläche —"}`; }
+  const m=/^check\.(\d+_\d+)\./.exec(path);
+  if(m){ const nr=m[1].replace("_","."); const it=itemsAll(S).find(i=>i.nr===nr); const a=ausw(it); const el=$(`[data-aw="${nr}"]`); if(el){el.className="aw "+(AW_CLS[a]||"");el.textContent=a;} }
+  const d=$('[data-calc="draft"]'); if(d) d.textContent=draft(S.fest);
+  const mm=/^maengel\.(\d+)\./.exec(path);
+  if(mm){ const i=+mm[1], mo=S.maengel[i], row=$(`[data-mrow="${i}"]`); if(row){ row.className="card mg "+mCls(mo); $(`[data-od="${i}"]`).textContent=mOverdue(mo)?"Frist überschritten":""; } }
+}
+
+/* ---------------------------------------------------------------- Ereignisse */
+document.addEventListener("input", e=>{
+  const k=e.target.dataset && e.target.dataset.k; if(!k||!S) return;
+  setP(S,k,e.target.value); touch(); updateCalc(k);
+});
+document.addEventListener("change", e=>{
+  const k=e.target.dataset && e.target.dataset.k; if(!k||!S) return;
+  setP(S,k,e.target.value); touch(); updateCalc(k);
+});
+document.addEventListener("click", async e=>{
+  const t=e.target.closest("button"); if(!t) return;
+  const d=t.dataset;
+  if(d.tab){ TAB=d.tab; render(); return; }
+  if(d.erg){ const nr=t.closest("[data-ci]").dataset.ci; const r=S.check[K(nr)]=S.check[K(nr)]||{}; r.e = r.e===d.erg? "" : d.erg;
+    touch(); $$(".seg button",t.parentNode).forEach(b=>b.classList.toggle("on",b.dataset.erg===r.e)); updateCalc(`check.${K(nr)}.e`); return; }
+  if(d.tog){ t.closest(".ci").classList.toggle("open"); return; }
+  if(d.tomangel){ const it=itemsAll(S).find(i=>i.nr===d.tomangel); if(!it.text){toast("Bitte zuerst den Prüfpunkt eintragen.");return;}
+    S.maengel.push({mangel:`${it.nr} ${it.text}: ${it.r.mangel||it.r.bem||"Abweichung festgestellt"}`,mass:it.r.mass||"",status:"Offen"}); touch(); toast(`Als Mangel Nr. ${S.maengel.length} übernommen`); return; }
+  if(t.id==="mAdd"){ S.maengel.push({status:"Offen"}); touch(); render(); setTimeout(()=>{const a=$$("[data-mrow]").pop(); a&&a.scrollIntoView({behavior:"smooth"}); const ta=a&&a.querySelector("textarea"); ta&&ta.focus()},50); return; }
+  if(d.mdel!==undefined){ if(confirm(`Mangel Nr. ${+d.mdel+1} löschen?`)){ S.maengel.splice(+d.mdel,1); touch(); render(); } return; }
+  if(d.phdel!==undefined){ if(confirm(`Bild ${+d.phdel+1} löschen?`)){ S.fotos.splice(+d.phdel,1); touch(); render(); } return; }
+  if(d.phmove!==undefined){ const i=+d.phmove,j=i+(+d.dir); [S.fotos[i],S.fotos[j]]=[S.fotos[j],S.fotos[i]]; touch(); render(); return; }
+  if(d.vermerk!==undefined){ const v=L.vermerk[+d.vermerk]; S.bew.vermerk = S.bew.vermerk===v? "" : v; touch(); render(); return; }
+  if(t.id==="draftCopy"){ if(S.fest.final && !confirm("Vorhandenen Freitext durch den Entwurf ersetzen?")) return; S.fest.final=draft(S.fest); touch(); render(); return; }
+  if(d.sigclr){ S.sig[d.sigclr]=Object.assign(S.sig[d.sigclr]||{}, {img:null}); touch(); render(); return; }
+  if(t.id==="btnList"){ await save(); showList(); return; }
+  if(t.id==="btnExport"){ exportV(); return; }
+  if(t.id==="btnPrint"){ doPrint(); return; }
+  if(t.id==="vNew"){ S=blank(); await save(); TAB="deck"; render(); return; }
+  if(t.id==="vImp"){ $("#fileImport").click(); return; }
+  if(d.vopen){ openV(d.vopen); return; }
+  if(d.vcopy){ const all=await DB.all(); const v=migrate(all.find(x=>x.id===d.vcopy)); const n=blank();
+    ["flaeche","antName","antAnschrift","schuetze","erlaubnis","standort","gemarkung","flur","flurstueck","koord","tierart","anzahl","sachbearbeiter"].forEach(k=>{ if(v.deck[k]) n.deck[k]=v.deck[k]; });
+    n.fest=JSON.parse(JSON.stringify(v.fest)); n.skizze=JSON.parse(JSON.stringify(v.skizze));
+    S=n; await save(); TAB="deck"; render(); toast("Neuer Vorgang mit Flächenangaben, Skizze und Festlegungen angelegt"); return; }
+  if(d.vdel){ const all=await DB.all(); const v=all.find(x=>x.id===d.vdel);
+    if(confirm(`Prüfbogen „${v.deck.az||"ohne Aktenzeichen"}“ endgültig von diesem Gerät löschen?\nVorher mit „Sichern“ als Datei speichern, falls noch benötigt.`)){ await DB.del(d.vdel); if(S&&S.id===d.vdel) S=null; showList(); } return; }
+});
+
+/* ---------------------------------------------------------------- Fotos */
+function compress(file,max=1600,q=0.8){return new Promise((res,rej)=>{
+  const url=URL.createObjectURL(file), im=new Image();
+  im.onload=()=>{ const s=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)); const c=document.createElement("canvas");
+    c.width=Math.round(im.naturalWidth*s); c.height=Math.round(im.naturalHeight*s); c.getContext("2d").drawImage(im,0,0,c.width,c.height);
+    URL.revokeObjectURL(url); res(c.toDataURL("image/jpeg",q)); };
+  im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("Bild konnte nicht gelesen werden"))};
+  im.src=url;
+})}
+document.addEventListener("change", async e=>{
+  const id=e.target.id;
+  if(id==="phCam"||id==="phGal"){
+    const files=Array.from(e.target.files||[]); if(!files.length) return;
+    toast("Foto wird übernommen …");
+    for(const f of files){ try{ S.fotos.push({img:await compress(f),datum:S.deck.datum||today(),ort:"",blick:"",beschr:"",maengel:""}); }catch(err){ toast(err.message); } }
+    touch(); await save(); render(); setTimeout(()=>{const c=$$(".card").pop(); c&&c.scrollIntoView({behavior:"smooth"})},60);
+  }
+  if(id==="skBg"){ const f=e.target.files[0]; if(!f) return; S.skizze.bg=await compress(f,2000,0.82); touch(); render(); }
+  if(id==="fileImport"){ const f=e.target.files[0]; e.target.value=""; if(!f) return;
+    try{ const v=migrate(JSON.parse(await f.text())); if(!v.deck) throw new Error("keine Prüfbogen-Datei");
+      const all=await DB.all(); if(all.some(x=>x.id===v.id) && !confirm("Dieser Vorgang ist bereits auf dem Gerät. Mit der Sicherung überschreiben?")) return;
+      S=v; await save(); TAB="deck"; render(); toast("Sicherung geöffnet");
+    }catch(err){ alert("Die Datei konnte nicht geöffnet werden: "+err.message); } }
+});
+
+/* ---------------------------------------------------------------- Skizze */
+let SK={tool:"pen",col:SK_COLORS[0][0],stamp:"S",cur:null,bgImg:null};
+function loadImg(src){return new Promise(r=>{if(!src) return r(null); const i=new Image(); i.onload=()=>r(i); i.onerror=()=>r(null); i.src=src;})}
+function arrowHead(ctx,a,b,size){const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);ctx.beginPath();ctx.moveTo(b[0],b[1]);ctx.lineTo(b[0]-size*Math.cos(ang-0.4),b[1]-size*Math.sin(ang-0.4));ctx.lineTo(b[0]-size*Math.cos(ang+0.4),b[1]-size*Math.sin(ang+0.4));ctx.closePath();ctx.fill()}
+function drawSketch(ctx,sk,bg,W=1600,H=1100){
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
+  if(bg){ const s=Math.min(W/bg.width,H/bg.height); const w=bg.width*s,h=bg.height*s; ctx.drawImage(bg,(W-w)/2,(H-h)/2,w,h); }
+  const items=sk.items.concat(SK.cur&&ctx.canvas.id==="skCanvas"?[SK.cur]:[]);
+  for(const it of items){
+    ctx.strokeStyle=ctx.fillStyle=it.c; ctx.lineWidth=it.w||5; ctx.lineCap=ctx.lineJoin="round";
+    if(it.t==="pen"){ ctx.beginPath(); it.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); if(it.pts.length===1) ctx.lineTo(it.pts[0][0]+.1,it.pts[0][1]); ctx.stroke(); }
+    else if(it.t==="arrow"||it.t==="line"){
+      ctx.beginPath(); ctx.moveTo(it.a[0],it.a[1]); ctx.lineTo(it.b[0],it.b[1]); ctx.stroke();
+      if(it.t==="arrow") arrowHead(ctx,it.a,it.b,34);
+      else { arrowHead(ctx,it.b,it.a,22); arrowHead(ctx,it.a,it.b,22); }
+      if(it.label){ const mx=(it.a[0]+it.b[0])/2,my=(it.a[1]+it.b[1])/2; ctx.font="bold 34px Arial"; const w=ctx.measureText(it.label).width;
+        ctx.fillStyle="rgba(255,255,255,.88)"; ctx.fillRect(mx-w/2-8,my-26,w+16,40); ctx.fillStyle=it.c; ctx.textAlign="center"; ctx.fillText(it.label,mx,my+6); ctx.textAlign="start"; }
+    } else if(it.t==="text"){
+      ctx.font=`bold ${it.size||44}px Arial`; const w=ctx.measureText(it.s).width;
+      ctx.fillStyle="rgba(255,255,255,.85)"; ctx.fillRect(it.x-w/2-8,it.y-(it.size||44)*.85,w+16,(it.size||44)*1.15);
+      ctx.fillStyle=it.c; ctx.textAlign="center"; ctx.fillText(it.s,it.x,it.y); ctx.textAlign="start";
+    }
+  }
+}
+async function initSketch(){
+  const cv=$("#skCanvas"), ctx=cv.getContext("2d");
+  SK.bgImg=await loadImg(S.skizze.bg);
+  const redraw=()=>drawSketch(ctx,S.skizze,SK.bgImg);
+  redraw();
+  const pos=e=>{const r=cv.getBoundingClientRect();return [ (e.clientX-r.left)*cv.width/r.width, (e.clientY-r.top)*cv.height/r.height ]};
+  cv.addEventListener("pointerdown",e=>{
+    e.preventDefault(); const p=pos(e);
+    if(SK.tool==="stamp"||SK.tool==="text"){
+      const s = SK.tool==="stamp"? SK.stamp : prompt("Text für die Skizze:");
+      if(s){ S.skizze.items.push({t:"text",c:SK.col,x:p[0],y:p[1],s}); touch(); redraw(); }
+      return;
+    }
+    cv.setPointerCapture(e.pointerId);
+    SK.cur = SK.tool==="pen"? {t:"pen",c:SK.col,w:5,pts:[p]} : {t:SK.tool,c:SK.col,w:5,a:p,b:p};
+    redraw();
+  });
+  cv.addEventListener("pointermove",e=>{ if(!SK.cur) return; e.preventDefault(); const p=pos(e);
+    if(SK.cur.t==="pen") SK.cur.pts.push(p); else SK.cur.b=p; redraw(); });
+  const end=e=>{ if(!SK.cur) return; const it=SK.cur; SK.cur=null;
+    if(it.t!=="pen" && Math.hypot(it.b[0]-it.a[0],it.b[1]-it.a[1])<15){ redraw(); return; }
+    if(it.t==="line"){ const m=prompt("Entfernung in Metern (leer lassen für keine Angabe):",""); if(m) it.label=m.trim().replace(/\s*m$/i,"")+" m"; }
+    S.skizze.items.push(it); touch(); redraw(); };
+  cv.addEventListener("pointerup",end); cv.addEventListener("pointercancel",end);
+  $("#skTools").addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b) return;
+    if(b.dataset.tool){ SK.tool=b.dataset.tool; if(b.dataset.s) SK.stamp=b.dataset.s; $$("#skTools [data-tool]").forEach(x=>x.classList.toggle("on",x===b)); }
+    if(b.dataset.col){ SK.col=b.dataset.col; $$("#skTools [data-col]").forEach(x=>x.classList.toggle("on",x===b)); }
+    if(b.dataset.act==="undo"){ S.skizze.items.pop(); touch(); redraw(); }
+    if(b.dataset.act==="clear"){ if(confirm("Gesamte Zeichnung löschen? (Hintergrund bleibt)")){ S.skizze.items=[]; touch(); redraw(); } }
+    if(b.dataset.act==="bg"){ $("#skBg").click(); }
+    if(b.dataset.act==="bgdel"){ S.skizze.bg=null; touch(); render(); }
+  });
+}
+
+/* ---------------------------------------------------------------- Unterschriften */
+function initSigs(){
+  $$("canvas[data-sig]").forEach(cv=>{
+    const key=cv.dataset.sig, ctx=cv.getContext("2d");
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+    const v=(S.sig[key]||{}).img; if(v){ loadImg(v).then(i=>i&&ctx.drawImage(i,0,0,cv.width,cv.height)); }
+    let drawing=false, last=null, dirty=false;
+    const pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
+    cv.addEventListener("pointerdown",e=>{e.preventDefault();cv.setPointerCapture(e.pointerId);drawing=true;last=pos(e);ctx.fillStyle="#0b1d3a";ctx.beginPath();ctx.arc(last[0],last[1],1.6,0,7);ctx.fill();dirty=true});
+    cv.addEventListener("pointermove",e=>{if(!drawing) return;e.preventDefault();const p=pos(e);ctx.strokeStyle="#0b1d3a";ctx.lineWidth=3.2;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(last[0],last[1]);ctx.lineTo(p[0],p[1]);ctx.stroke();last=p});
+    const end=()=>{ if(!drawing) return; drawing=false; if(dirty){ S.sig[key]=Object.assign(S.sig[key]||{}, {img:cv.toDataURL("image/png")}); touch(); } };
+    cv.addEventListener("pointerup",end); cv.addEventListener("pointercancel",end);
+  });
+}
+
+/* ---------------------------------------------------------------- Sichern */
+function fileName(ext){ const az=(S.deck.az||"ohne-Az").replace(/[^\wäöüÄÖÜß.-]+/g,"_"); return `Pruefbogen_${az}_${S.deck.datum||today()}.${ext}`; }
+async function exportV(){
+  await save();
+  const blob=new Blob([JSON.stringify(S)],{type:"application/json"});
+  // iPad / Tablet: Teilen-Menü (In Dateien sichern, AirDrop) – bleibt auf dem Gerät bzw. im Nahbereich
+  try{
+    const file=new File([blob],fileName("json"),{type:"application/json"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:fileName("json")}); return; }
+  }catch(e){ if(e && e.name==="AbortError") return; }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fileName("json");
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+  toast("Sicherungsdatei wird gespeichert");
+}
+
+/* ---------------------------------------------------------------- Druck / PDF */
+function pHead(title,p){
+  const d=S.deck;
+  return `<div class="pt">${esc(title)}</div><div class="pk">Landkreis Jerichower Land · Untere Waffenbehörde · Ortsbesichtigung und sicherheitstechnische Überprüfung vor Erteilung einer Schießerlaubnis nach § 10 Abs. 5 WaffG</div>
+<div class="pz">Aktenzeichen: ${esc(d.az||"____________")} &nbsp;&nbsp; Ortsbesichtigung am: ${esc(dDE(d.datum)||"____________")} &nbsp;&nbsp; Fläche: ${esc(d.standort||"____________")}</div><div class="pp ${p}">${PART_TXT[p]}</div>`;
+}
+const tr=(l,v)=>`<tr><td class="l">${esc(l)}</td><td>${esc(v||"")}</td></tr>`;
+async function doPrint(){
+  await save();
+  const d=S.deck, x=summary(S);
+  let h="";
+  h+=`<section class="pg">${pHead("1. Allgemeine Angaben (Deckblatt)","A")}<table class="p">
+<tr class="s"><td colspan="2">Verfahren</td></tr>${tr("Aktenzeichen",d.az)}${tr("Art der Fläche",d.flaeche)}${tr("Datum der Ortsbesichtigung",dDE(d.datum))}${tr("Uhrzeit",(d.von||"")+(d.bis?" – "+d.bis:"")+(d.von||d.bis?" Uhr":""))}
+<tr class="s"><td colspan="2">Antragsteller und Schütze</td></tr>${tr("Name des Antragstellers",d.antName)}${tr("Anschrift des Antragstellers",d.antAnschrift)}${tr("Name des Schützen",d.schuetze)}${tr("Waffenrechtliche Erlaubnis des Schützen",d.erlaubnis)}
+<tr class="s"><td colspan="2">Örtlichkeit</td></tr>${tr("Standort des Gatters / der Weide",d.standort)}${tr("Gemarkung",d.gemarkung)}${tr("Flur",d.flur)}${tr("Flurstück(e)",d.flurstueck)}${tr("Koordinaten",d.koord)}
+<tr class="s"><td colspan="2">Tiere und geplante Durchführung</td></tr>${tr("Tierart",d.tierart)}${tr("Anzahl der Tiere",d.anzahl)}${tr("davon zur Erlegung vorgesehen",d.erlegung)}${tr("Geplantes Datum der Schussabgabe",dDE(d.schussDatum))}
+<tr class="s"><td colspan="2">Beteiligte</td></tr>${tr("Teilnehmende Personen",d.teilnehmer)}${tr("Zuständige Sachbearbeiter",d.sachbearbeiter)}${tr("Beteiligung des Veterinäramtes",d.vet)}${tr("Vertreter / Stellungnahme Veterinäramt",d.vetName)}
+</table><p class="pnote">Gliederung: Teil A – Dokumentierte Feststellungen · Teil B – Fachliche Sicherheitsbewertung · Teil C – Behördliche Entscheidung (erfolgt ausschließlich durch gesonderten Bescheid).</p></section>`;
+  h+=`<section class="pg">${pHead("2. Checkliste zur Ortsbesichtigung","A")}<table class="p"><tr><th>Nr.</th><th>Prüfpunkt</th><th>Soll</th><th>Ergebnis</th><th>Auswertung</th><th>Bemerkungen</th><th>Festgestellter Mangel</th><th>Erforderliche Maßnahme</th></tr>`;
+  CHECK.forEach((sec,si)=>{ h+=`<tr class="s"><td colspan="8">${si+1}. ${esc(sec.sec)}</td></tr>`;
+    itemsAll(S).filter(i=>i.sec===sec.sec && (i.text||!sec.extra)).forEach(i=>{ const a=ausw(i);
+      h+=`<tr><td>${i.nr}</td><td>${esc(i.text)}</td><td>${esc(i.soll)}</td><td>${esc(i.r.e||"")}</td><td><span class="aw ${AW_CLS[a]||""}">${esc(a)}</span></td><td>${esc(i.r.bem||"")}</td><td>${esc(i.r.mangel||"")}</td><td>${esc(i.r.mass||"")}</td></tr>`; });
+  });
+  h+=`</table><p class="pnote">Soll = sicherheitstechnisch erwartete Antwort; „Info“ = Sachverhaltsangabe. Die Auswertung ist eine rechnerische Hilfe und keine Sicherheitsbewertung.</p></section>`;
+  // Skizze
+  const c=document.createElement("canvas"); c.width=1600; c.height=1100;
+  drawSketch(c.getContext("2d"),S.skizze,await loadImg(S.skizze.bg));
+  const sk=S.skizze;
+  h+=`<section class="pg">${pHead("3. Skizze und Lageplan","A")}<table class="p">${tr("Art der Darstellung",sk.art)}${tr("Maßstab (ca.)",sk.massstab)}${tr("Nordrichtung / Ausrichtung",sk.nord)}${tr("Quelle / Nutzungshinweis",sk.quelle)}</table>
+<img class="pimg" src="${c.toDataURL("image/jpeg",0.9)}" alt="Skizze">
+<table class="p" style="margin-top:6px"><tr><th>Element</th><th>Darstellung</th><th>Beschreibung / Wert</th></tr>${SK_LEG.map(([k,l,dd])=>`<tr><td>${esc(l)}</td><td>${esc(getP(S,`skizze.legend.${k}.sym`)??dd)}</td><td>${esc(getP(S,`skizze.legend.${k}.wert`)||"")}</td></tr>`).join("")}</table></section>`;
+  // Fotos
+  if(S.fotos.length){
+    for(let i=0;i<S.fotos.length;i+=2){
+      h+=`<section class="pg">${pHead("4. Fotodokumentation","A")}`;
+      S.fotos.slice(i,i+2).forEach((p,k)=>{ const n=i+k+1;
+        h+=`<div class="ph2"><img class="pimg" style="max-height:95mm" src="${p.img}" alt="Bild ${n}"><table class="p">${tr("Bildnummer",String(n))}${tr("Datum der Aufnahme",dDE(p.datum))}${tr("Aufnahmeort",p.ort)}${tr("Blickrichtung",p.blick)}${tr("Beschreibung",p.beschr)}${tr("Festgestellte Sicherheitsmängel",p.maengel)}</table></div>`; });
+      h+=`</section>`;
+    }
+  } else h+=`<section class="pg">${pHead("4. Fotodokumentation","A")}<p>Keine Fotos aufgenommen.</p></section>`;
+  // Mängel + Übersicht
+  h+=`<section class="pg">${pHead("5. Festgestellte Mängel und Maßnahmen","A")}<table class="p"><tr><th>Nr.</th><th>Festgestellter Mangel</th><th>Sicherheitsrelevanz</th><th>Erforderliche Maßnahme</th><th>Verantwortlich</th><th>Frist</th><th>Erledigt am</th><th>Status</th><th>Nachkontrolle</th></tr>
+${S.maengel.filter(m=>m.mangel).length? S.maengel.map((m,i)=>m.mangel?`<tr class="mgp" style="background:${mCls(m)==="krit"?"#f4cccc":mCls(m)==="erl"?"#d9ead3":"#fff2cc"}"><td>${i+1}</td><td>${esc(m.mangel)}</td><td>${esc(m.rel||"")}</td><td>${esc(m.mass||"")}</td><td>${esc(m.verantw||"")}</td><td>${esc(dDE(m.frist))}</td><td>${esc(dDE(m.erl))}</td><td>${esc(mStatus(m))}</td><td>${esc(m.nk||"")}</td></tr>`:"").join("") : '<tr><td colspan="9">Keine Mängel festgestellt.</td></tr>'}</table>
+<div class="pp A" style="margin-top:10px">Automatische Zusammenfassung der Prüfergebnisse</div>
+<div class="status ${x.cls}">${esc(x.st)}</div>
+<table class="p" style="margin-top:6px"><tr><th>Bereich</th><th>Prüfpunkte</th><th>Ja</th><th>Nein</th><th>n. z.</th><th>n. gepr.</th><th>Unbeantw.</th><th>Abweichungen</th></tr>
+${x.secs.concat([x.tot]).map(r=>`<tr${r.sec==="Gesamt"?' class="s"':""}><td>${esc(r.sec)}</td>${["n","ja","nein","nz","ng","offen","abw"].map(k=>`<td>${r[k]}</td>`).join("")}</tr>`).join("")}</table>
+<p class="pnote">Mängel gesamt ${x.M.ges} · offen ${x.M.offen} · erledigt ${x.M.erl} · kritisch offen ${x.M.krit} · Frist überschritten ${x.M.ueber} · Nachkontrolle erforderlich ${x.M.nk}. Bearbeitungsstand Checkliste ${x.prog} %. Der Gesamtstatus ist weder eine Sicherheitsbewertung noch eine Entscheidung.</p></section>`;
+  // Festlegungen
+  const f=S.fest;
+  h+=`<section class="pg">${pHead("6. Festlegungen für die Schießerlaubnis","B")}<table class="p">${tr("Zulässiger Schützenstandort",f.standort)}${tr("Zulässige Schussrichtung",f.richtung)}${tr("Zulässige maximale Schussentfernung",f.entf?f.entf+" m":"")}${tr("Anforderungen an den Kugelfang",f.kugelfang)}${tr("Erforderliche Absperrmaßnahmen",f.absperr)}${tr("Besondere Sicherheitsauflagen",f.auflagen)}${tr("Sonstige Einschränkungen",f.sonst)}</table>
+<table class="p"><tr><th>Sicherheitsauflagen zur Übernahme in den Bescheid</th></tr><tr><td>${esc(f.final||draft(f))}</td></tr></table>
+<p class="pnote">Die Festlegungen sind Vorschläge der prüfenden Mitarbeiter und werden erst durch den Bescheid rechtsverbindlich.</p></section>`;
+  // Bewertung
+  const b=S.bew, p=plaus(S);
+  h+=`<section class="pg">${pHead("7. Abschließende Bewertung (Prüfvermerk)","B")}
+<table class="p"><tr class="s"><td colspan="2">Teil B – Fachliche Sicherheitsbewertung</td></tr>
+<tr><td class="l">Prüfvermerk</td><td>${L.vermerk.map(v=>`${b.vermerk===v?"☒":"☐"} ${esc(v)}`).join("<br>")}</td></tr>
+${p.w?tr("Plausibilitätshinweis",p.t):""}${tr("Begründung",b.begr)}${tr("Offene Punkte",b.offen)}${tr("Weitere erforderliche Prüfungen",b.weitere)}</table>
+<p class="pnote">Der Prüfvermerk ist eine fachliche Stellungnahme zur Sicherheit der Schussabgabe. Er ersetzt nicht die rechtliche Prüfung und Entscheidung über den Antrag und begründet keinen Anspruch auf Erteilung.</p>
+<div class="pp C">Teil C – Behördliche Entscheidung (nur Verweis – Entscheidung erfolgt durch gesonderten Bescheid)</div>
+<table class="p">${tr("Stand der Entscheidung",b.entsch)}${tr("Datum des Bescheids",dDE(b.bDatum))}${tr("Aktenzeichen / Bezug des Bescheids",b.bAz)}${tr("Entscheidung gezeichnet durch",b.bDurch)}</table></section>`;
+  // Unterschriften
+  const sg=S.sig, sb=(k,t,txt)=>{const v=sg[k]||{};return `<table class="p"><tr class="s"><td colspan="2">${esc(t)}</td></tr>${txt?`<tr><td colspan="2" style="font-style:italic">${esc(txt)}</td></tr>`:""}${tr("Name",v.name)}<tr><td class="l">Unterschrift</td><td><div class="sigp">${v.img?`<img src="${v.img}" alt="">`:""}</div></td></tr></table>`};
+  h+=`<section class="pg">${pHead("8. Unterschriften","N")}<table class="p">${tr("Ort",sg.ort)}${tr("Datum",dDE(sg.datum))}</table>
+${sb("p1","Prüfender Mitarbeiter der unteren Waffenbehörde")}${sb("p2","Weiterer Mitarbeiter der unteren Waffenbehörde")}
+${sb("ant","Antragsteller – Bestätigung der besprochenen örtlichen Festlegungen","Mir wurden die vor Ort besprochenen örtlichen Festlegungen (Schützenstandort, Schussrichtung, maximale Schussentfernung, Kugelfang, Absperrmaßnahmen) erläutert. Diese Bestätigung ist keine Genehmigung; über den Antrag wird gesondert durch Bescheid entschieden.")}
+<table class="p">${tr("Datenschutzinformation nach Art. 13 DSGVO ausgehändigt",sg.art13)}</table></section>`;
+  $("#print").innerHTML=h;
+  const prevTitle=document.title; document.title=fileName("pdf").replace(/\.pdf$/,"");
+  await Promise.all($$("#print img").map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));
+  setTimeout(()=>{ window.print(); setTimeout(()=>{document.title=prevTitle},1000); },100);
+}
+
+/* ---------------------------------------------------------------- Start */
+(async function(){
+  // Offline-Betrieb: Programmdateien werden einmalig im Gerät zwischengespeichert (nur Programm, keine Daten)
+  if("serviceWorker" in navigator && /^https?:$/.test(location.protocol)){
+    try{ await navigator.serviceWorker.register("sw.js"); }catch(e){}
+  }
+  await DB.open();
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  window.addEventListener("beforeunload",()=>{ if(saveT){ clearTimeout(saveT); save(); } });
+  document.addEventListener("visibilitychange",()=>{ if(document.hidden && S) save(); });
+  showList();
+})();
+</script>
+</body>
+</html>
