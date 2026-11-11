@@ -1,0 +1,14 @@
+{
+  "name": "Prüfbogen Ortsbesichtigung § 10 Abs. 5 WaffG",
+  "short_name": "Prüfbogen",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#1f3a5f",
+  "icons": [
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
