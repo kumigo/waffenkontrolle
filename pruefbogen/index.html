@@ -12846,7 +12846,7 @@ ${fText("Nordrichtung / Ausrichtung","skizze.nord")}${fText("Quelle / Nutzungshi
   ${SK_COLORS.map(([c,t],i)=>`<button class="sw${i===0?" on":""}" data-col="${c}" title="${esc(t)}" style="background:${c}"></button>`).join("")}
   <span style="width:8px"></span>
   <button data-act="undo">↶ Rückgängig</button><button data-act="bg">🖼 Hintergrund (Foto/Lageplan)</button>
-  ${sk.bg?'<button data-act="bgdel">Hintergrund entfernen</button>':""}<button data-act="clear">Alles löschen</button>
+  ${sk.bg?`<button data-act="bgfit">${sk.bgFit==="ganz"?"⤢ Feld ausfüllen":"⤡ Ganzes Bild zeigen"}</button><button data-act="bgdel">Hintergrund entfernen</button>`:""}<button data-act="clear">Alles löschen</button>
 </div>
 <div class="legend">${SK_COLORS.map(([c,t])=>`<span><i style="background:${c}"></i>${esc(t)}</span>`).join("")}</div>
 <div class="row lockbar"><button class="btn lockbtn" data-lock="sk">🔒 Gesperrt – antippen zum Zeichnen</button><span class="note">Gesperrt: Wischen blättert die Seite. Mit Apple Pencil kann trotzdem gezeichnet werden.</span></div>
@@ -13025,7 +13025,7 @@ function loadImg(src){return new Promise(r=>{if(!src) return r(null); const i=ne
 function arrowHead(ctx,a,b,size){const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);ctx.beginPath();ctx.moveTo(b[0],b[1]);ctx.lineTo(b[0]-size*Math.cos(ang-0.4),b[1]-size*Math.sin(ang-0.4));ctx.lineTo(b[0]-size*Math.cos(ang+0.4),b[1]-size*Math.sin(ang+0.4));ctx.closePath();ctx.fill()}
 function drawSketch(ctx,sk,bg,W=1600,H=1100){
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
-  if(bg){ const s=Math.min(W/bg.width,H/bg.height); const w=bg.width*s,h=bg.height*s; ctx.drawImage(bg,(W-w)/2,(H-h)/2,w,h); }
+  if(bg){ const s=(sk.bgFit==="ganz"?Math.min:Math.max)(W/bg.width,H/bg.height); const w=bg.width*s,h=bg.height*s; ctx.drawImage(bg,(W-w)/2,(H-h)/2,w,h); }
   const items=sk.items.concat(SK.cur&&ctx.canvas.id==="skCanvas"?[SK.cur]:[]);
   for(const it of items){
     ctx.strokeStyle=ctx.fillStyle=it.c; ctx.lineWidth=it.w||5; ctx.lineCap=ctx.lineJoin="round";
@@ -13075,6 +13075,7 @@ async function initSketch(){
     if(b.dataset.act==="undo"){ S.skizze.items.pop(); touch(); redraw(); }
     if(b.dataset.act==="clear"){ if(confirm("Gesamte Zeichnung löschen? (Hintergrund bleibt)")){ S.skizze.items=[]; touch(); redraw(); } }
     if(b.dataset.act==="bg"){ $("#skBg").click(); }
+    if(b.dataset.act==="bgfit"){ S.skizze.bgFit = S.skizze.bgFit==="ganz"? "" : "ganz"; touch(); render(); }
     if(b.dataset.act==="bgdel"){ S.skizze.bg=null; touch(); render(); }
   });
 }
