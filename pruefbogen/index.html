@@ -251,11 +251,10 @@ const SK_LEG = [
 ];
 const TABS = [
   ["deck","1 Deckblatt","A"],["check","2 Checkliste","A"],["skizze","3 Skizze","A"],["fotos","4 Fotos","A"],
-  ["maengel","5 Mängel","A"],["uebersicht","Übersicht","A"],["fest","6 Festlegungen","B"],
-  ["bew","7 Bewertung","B"],["sig","8 Unterschriften","N"]
+  ["maengel","5 Mängel","A"],["uebersicht","Übersicht","A"]
 ];
 const PART_COL = {A:"#2e6b8a",B:"#b07d2b",C:"#6b5a8e",N:"#888"};
-const PART_TXT = {A:"Teil A – Dokumentierte Feststellungen",B:"Teil B – Fachliche Sicherheitsbewertung",C:"Teil C – Behördliche Entscheidung (gesonderter Bescheid)",N:"Unterschriften"};
+const PART_TXT = {A:"Abnahme des Gatters / der Weide – dokumentierte Feststellungen",B:"Teil B – Fachliche Sicherheitsbewertung",C:"Teil C – Behördliche Entscheidung (gesonderter Bescheid)",N:"Unterschriften"};
 
 /* ---------------------------------------------------------------- Helfer */
 const $ = (s,r=document)=>r.querySelector(s);
@@ -344,25 +343,6 @@ function summary(s){
   const auff = its.filter(i=>["Abweichung","nicht geprüft"].includes(ausw(i)));
   return {secs,tot,M,st,cls,prog,auff};
 }
-function draft(f){
-  const parts=[];
-  if(f.standort) parts.push("• Die Schussabgabe ist ausschließlich von folgendem Schützenstandort zulässig: "+f.standort);
-  if(f.richtung) parts.push("• Zulässige Schussrichtung: "+f.richtung+". Schussabgaben in andere Richtungen sind unzulässig.");
-  if(f.entf) parts.push("• Die Schussentfernung darf "+f.entf+" m nicht überschreiten.");
-  if(f.kugelfang) parts.push("• Kugelfang: "+f.kugelfang);
-  if(f.absperr) parts.push("• Absperrmaßnahmen: "+f.absperr);
-  if(f.auflagen) parts.push("• Besondere Sicherheitsauflagen: "+f.auflagen);
-  if(f.sonst) parts.push("• Sonstige Einschränkungen: "+f.sonst);
-  return parts.length? parts.join("\n") : "(Noch keine Festlegungen erfasst.)";
-}
-function plaus(s){
-  const v=s.bew.vermerk, x=summary(s);
-  if(!v) return {t:"Bitte Prüfvermerk auswählen.",w:false};
-  if(v===L.vermerk[0] && (x.M.krit>0||x.tot.abw>0||x.M.offen>0||x.tot.ng>0||x.tot.offen>0))
-    return {t:"Achtung: Der Prüfvermerk „keine Sicherheitsbedenken“ steht im Widerspruch zu dokumentierten Abweichungen, offenen Mängeln oder nicht geprüften Punkten. Bitte Begründung ergänzen bzw. Feststellungen prüfen.",w:true};
-  return {t:"Keine Widersprüche zwischen Prüfvermerk und dokumentierten Feststellungen erkannt.",w:false};
-}
-
 /* ---------------------------------------------------------------- Formular-Bausteine */
 function fText(label,path,o={}){
   const v=getP(S,path)??"";
@@ -402,17 +382,7 @@ ${fText("Waffenrechtliche Erlaubnis des Schützen (Art, Nummer, Behörde)","deck
 <h3>Örtlichkeit</h3><div class="grid">
 ${fText("Standort des Gatters / der Weide (Bezeichnung, Lage)","deck.standort",{wide:true})}
 ${fText("Gemarkung","deck.gemarkung")}${fText("Flur","deck.flur")}${fText("Flurstück(e)","deck.flurstueck")}${fText("Koordinaten (optional)","deck.koord")}
-</div>
-<h3>Tiere und geplante Durchführung</h3><div class="grid">
-${fText("Tierart","deck.tierart",{list:"tierart",ph:"auswählen oder eintippen"})}${fText("Anzahl der Tiere","deck.anzahl",{type:"number"})}
-${fText("davon zur Erlegung vorgesehen","deck.erlegung",{type:"number"})}${fText("Geplantes Datum der Schussabgabe","deck.schussDatum",{type:"date"})}
-</div>
-<h3>Beteiligte</h3><div class="grid">
-${fText("Teilnehmende Personen (Name, Funktion)","deck.teilnehmer",{area:true,tall:true})}
-${fText("Zuständige Sachbearbeiter der Waffenbehörde","deck.sachbearbeiter",{area:true})}
-${fSel("Beteiligung des Veterinäramtes","deck.vet",L.vet)}${fText("Vertreter / Stellungnahme Veterinäramt","deck.vetName",{area:true})}
-</div>
-<div class="box A">Gliederung: <b>Teil A</b> Dokumentierte Feststellungen (Blätter 1–5, Übersicht) · <b>Teil B</b> Fachliche Sicherheitsbewertung (6, 7) · <b>Teil C</b> Behördliche Entscheidung – erfolgt ausschließlich durch gesonderten Bescheid.</div>`;
+</div>`;
 
 VIEWS.check = ()=>{
   let h=`${part("A")}<h2>2. Checkliste zur Ortsbesichtigung</h2>${ctxLine()}
@@ -503,7 +473,7 @@ VIEWS.uebersicht = ()=>{
   const om=S.maengel.map((m,i)=>({m,i})).filter(o=>mOpen(o.m));
   return `${part("A")}<h2>Automatische Zusammenfassung der Prüfergebnisse</h2>${ctxLine()}
 <div class="status ${x.cls}">${esc(x.st)}</div>
-<p class="note">Der Gesamtstatus fasst die dokumentierten Feststellungen rechnerisch zusammen. Er ist weder eine fachliche Sicherheitsbewertung (Teil B) noch eine behördliche Entscheidung (Teil C).</p>
+<p class="note">Der Gesamtstatus fasst die dokumentierten Feststellungen rechnerisch zusammen. Er ist eine rechnerische Hilfe und ersetzt keine fachliche Beurteilung.</p>
 <h3>Checkliste nach Bereichen</h3><div class="tw"><table class="t"><tr><th>Bereich</th><th>Prüfpunkte</th><th>Ja</th><th>Nein</th><th>n. z.</th><th>n. gepr.</th><th>Unbeantw.</th><th>Abweichungen</th></tr>
 ${x.secs.concat([x.tot]).map(r=>`<tr class="${r.sec==="Gesamt"?"sum":""}"><td>${esc(r.sec)}</td>${["n","ja","nein","nz","ng","offen","abw"].map(k=>`<td class="n">${r[k]}</td>`).join("")}</tr>`).join("")}
 </table></div><p>Bearbeitungsstand Checkliste: <b>${x.prog} %</b></p>
@@ -516,58 +486,6 @@ ${x.auff.length? `<div class="tw"><table class="t"><tr><th>Nr. / Prüfpunkt</th>
 <h3>Offene Mängel</h3>
 ${om.length? `<div class="tw"><table class="t"><tr><th>Nr. / Mangel</th><th>Relevanz</th><th>Frist</th><th>Status</th><th>Maßnahme</th><th>Verantwortlich</th></tr>${om.map(({m,i})=>`<tr style="background:${m.rel==="Kritisch"?"var(--bad)":"var(--warn)"}"><td>${i+1}. ${esc(m.mangel)}</td><td>${esc(m.rel||"")}</td><td class="${mOverdue(m)?"overdue":""}">${esc(dDE(m.frist))}</td><td>${esc(mStatus(m))}</td><td>${esc(m.mass||"")}</td><td>${esc(m.verantw||"")}</td></tr>`).join("")}</table></div>` : '<p class="note">Keine offenen Mängel.</p>'}`;
 };
-
-VIEWS.fest = ()=> `${part("B")}<h2>6. Festlegungen für die Schießerlaubnis</h2>${ctxLine()}
-<div class="box B">Örtliche Festlegungen aus fachlicher Sicht als Grundlage für den späteren Bescheid. Sie werden erst durch den Bescheid rechtsverbindlich.</div>
-<div class="grid">
-${fText("Zulässiger Schützenstandort","fest.standort",{area:true})}${fText("Zulässige Schussrichtung","fest.richtung",{area:true})}
-${fText("Zulässige maximale Schussentfernung (m)","fest.entf",{type:"number"})}${fText("Anforderungen an den Kugelfang","fest.kugelfang",{area:true})}
-${fText("Erforderliche Absperrmaßnahmen","fest.absperr",{area:true})}${fText("Besondere Sicherheitsauflagen","fest.auflagen",{area:true})}
-${fText("Sonstige Einschränkungen","fest.sonst",{area:true,wide:true})}
-</div>
-<h3>Automatischer Textentwurf der Sicherheitsauflagen</h3>
-<div class="calc" data-calc="draft">${esc(draft(S.fest))}</div>
-<div class="row" style="margin-top:8px"><button class="btn" id="draftCopy">Entwurf in Freitext übernehmen</button></div>
-<h3>Redaktionell überarbeitete Fassung (zur Übernahme in den Bescheid)</h3>
-${fText("","fest.final",{area:true,tall:true})}`;
-
-VIEWS.bew = ()=>{
-  const x=summary(S), p=plaus(S);
-  return `${part("B")}<h2>7. Abschließende Bewertung (Prüfvermerk)</h2>${ctxLine()}
-<h3 style="background:var(--a);color:var(--a-t)">Grundlage: Dokumentierte Feststellungen (Teil A) – automatisch</h3>
-<div class="tw"><table class="t">
-<tr><td>Prüfpunkte gesamt / Bearbeitungsstand</td><td class="n">${x.tot.n} / ${x.prog} %</td></tr>
-<tr><td>Abweichungen vom Soll</td><td class="n">${x.tot.abw}</td></tr><tr><td>Nicht geprüft / unbeantwortet</td><td class="n">${x.tot.ng} / ${x.tot.offen}</td></tr>
-<tr><td>Offene Mängel / davon kritisch</td><td class="n">${x.M.offen} / ${x.M.krit}</td></tr></table></div>
-<div class="status ${x.cls}" style="margin-top:8px">${esc(x.st)}</div>
-<h3 style="background:var(--b);color:var(--b-t)">Teil B – Fachliche Sicherheitsbewertung</h3>
-<div class="pv">${L.vermerk.map((v,i)=>`<button class="v${i}${S.bew.vermerk===v?" on":""}" data-vermerk="${i}">${S.bew.vermerk===v?"◉":"○"} ${esc(v)}</button>`).join("")}</div>
-<div class="plaus ${p.w?"warn":"ok"}" data-calc="plaus" style="margin-top:10px">${esc(p.t)}</div>
-<div class="grid" style="margin-top:10px">
-${fText("Begründung","bew.begr",{area:true,tall:true,wide:true})}
-${fText("Offene Punkte","bew.offen",{area:true})}
-${fText("Weitere erforderliche Prüfungen","bew.weitere",{area:true,ph:"z. B. Veterinäramt / Tierschutz, Zustimmung Grundstückseigentümer, Straßenverkehrsbehörde, Naturschutz"})}
-</div>
-<div class="box B">Der Prüfvermerk ist eine fachliche Stellungnahme zur Sicherheit der Schussabgabe. Er ersetzt nicht die rechtliche Prüfung und Entscheidung über den Antrag (z. B. Bedürfnis, Zuverlässigkeit, Sachkunde, tierschutzrechtliche Belange) und begründet keinen Anspruch auf Erteilung.</div>
-<h3 style="background:var(--c);color:var(--c-t)">Teil C – Behördliche Entscheidung (nur Verweis)</h3>
-<div class="box C">Über den Antrag entscheidet die untere Waffenbehörde ausschließlich durch schriftlichen Bescheid. Diese Felder verweisen nur auf die Entscheidung und werden nicht automatisch befüllt.</div>
-<div class="grid">${fSel("Stand der Entscheidung","bew.entsch",L.entsch)}${fText("Datum des Bescheids","bew.bDatum",{type:"date"})}
-${fText("Aktenzeichen / Bezug des Bescheids","bew.bAz")}${fText("Entscheidung gezeichnet durch","bew.bDurch")}</div>`;
-};
-
-function sigBlock(key,title,text){
-  const v=S.sig[key]||{};
-  return `<h3>${esc(title)}</h3>${text?`<div class="box" style="background:var(--light)">${esc(text)}</div>`:""}
-<div class="grid">${fText("Name (Druckbuchstaben)",`sig.${key}.name`)}</div>
-<div style="margin-top:8px" class="sig locked"><canvas data-sig="${key}" width="900" height="225"></canvas><div class="sigline">Unterschrift</div></div>
-<div class="row" style="margin-top:6px"><button class="btn sm lockbtn" data-lock="${key}">🔒 Gesperrt – antippen zum Zeichnen</button><button class="btn sm" data-sigclr="${key}">Unterschrift löschen</button>${v.img?'<span class="note">✓ Unterschrift gespeichert</span>':""}</div>`;
-}
-VIEWS.sig = ()=> `${part("N")}<h2>8. Unterschriften</h2>${ctxLine()}
-<div class="grid">${fText("Ort","sig.ort")}${fText("Datum","sig.datum",{type:"date"})}</div>
-${sigBlock("p1","Prüfender Mitarbeiter der unteren Waffenbehörde")}
-${sigBlock("p2","Weiterer Mitarbeiter der unteren Waffenbehörde")}
-${sigBlock("ant","Antragsteller – Bestätigung der besprochenen örtlichen Festlegungen","Mit meiner Unterschrift bestätige ich, dass mir die vor Ort besprochenen örtlichen Festlegungen (insbesondere Schützenstandort, Schussrichtung, maximale Schussentfernung, Kugelfang und Absperrmaßnahmen – siehe Festlegungen) erläutert wurden. Diese Bestätigung ist keine Genehmigung; über den Antrag wird gesondert durch Bescheid entschieden.")}
-<div class="grid" style="margin-top:10px">${fSel("Datenschutzinformation nach Art. 13 DSGVO ausgehändigt","sig.art13",L.janein)}</div>`;
 
 /* ---------------------------------------------------------------- Vorgangsliste */
 async function showList(){
@@ -609,14 +527,12 @@ function render(){
   renderTabs();
   $("#main").innerHTML = VIEWS[TAB]() + datalists();
   if(TAB==="skizze") initSketch();
-  if(TAB==="sig") initSigs();
   window.scrollTo(0,0);
 }
 function updateCalc(path){
   if(path.startsWith("deck.")){ const tmp=document.createElement("div"); tmp.innerHTML=ctxLine(); $$(".ctx").forEach(e=>e.innerHTML=tmp.firstChild.innerHTML); $("#hdrSub").textContent=`Az.: ${S.deck.az||"—"} · ${S.deck.standort||"Fläche —"}`; }
   const m=/^check\.(\d+_\d+)\./.exec(path);
   if(m){ const nr=m[1].replace("_","."); const it=itemsAll(S).find(i=>i.nr===nr); const a=ausw(it); const el=$(`[data-aw="${nr}"]`); if(el){el.className="aw "+(AW_CLS[a]||"");el.textContent=a;} }
-  const d=$('[data-calc="draft"]'); if(d) d.textContent=draft(S.fest);
   const mm=/^maengel\.(\d+)\./.exec(path);
   if(mm){ const i=+mm[1], mo=S.maengel[i], row=$(`[data-mrow="${i}"]`); if(row){ row.className="card mg "+mCls(mo); $(`[data-od="${i}"]`).textContent=mOverdue(mo)?"Frist überschritten":""; } }
 }
@@ -637,7 +553,7 @@ document.addEventListener("click", async e=>{
   if(d.erg){ const nr=t.closest("[data-ci]").dataset.ci; const r=S.check[K(nr)]=S.check[K(nr)]||{}; r.e = r.e===d.erg? "" : d.erg;
     touch(); $$(".seg button",t.parentNode).forEach(b=>b.classList.toggle("on",b.dataset.erg===r.e)); updateCalc(`check.${K(nr)}.e`); return; }
   if(d.tog){ t.closest(".ci").classList.toggle("open"); return; }
-  if(d.lock){ const w = d.lock==="sk"? $(".cwrap") : $(`canvas[data-sig="${d.lock}"]`).parentNode;
+  if(d.lock){ const w = $(".cwrap");
     const l=w.classList.toggle("locked"); t.textContent = l? LOCK_TXT : UNLOCK_TXT; t.classList.toggle("on",!l); return; }
   if(d.tomangel){ const it=itemsAll(S).find(i=>i.nr===d.tomangel); if(!it.text){toast("Bitte zuerst den Prüfpunkt eintragen.");return;}
     S.maengel.push({mangel:`${it.nr} ${it.text}: ${it.r.mangel||it.r.bem||"Abweichung festgestellt"}`,mass:it.r.mass||"",status:"Offen"}); touch(); toast(`Als Mangel Nr. ${S.maengel.length} übernommen`); return; }
@@ -645,9 +561,6 @@ document.addEventListener("click", async e=>{
   if(d.mdel!==undefined){ if(confirm(`Mangel Nr. ${+d.mdel+1} löschen?`)){ S.maengel.splice(+d.mdel,1); touch(); render(); } return; }
   if(d.phdel!==undefined){ if(confirm(`Bild ${+d.phdel+1} löschen?`)){ S.fotos.splice(+d.phdel,1); touch(); render(); } return; }
   if(d.phmove!==undefined){ const i=+d.phmove,j=i+(+d.dir); [S.fotos[i],S.fotos[j]]=[S.fotos[j],S.fotos[i]]; touch(); render(); return; }
-  if(d.vermerk!==undefined){ const v=L.vermerk[+d.vermerk]; S.bew.vermerk = S.bew.vermerk===v? "" : v; touch(); render(); return; }
-  if(t.id==="draftCopy"){ if(S.fest.final && !confirm("Vorhandenen Freitext durch den Entwurf ersetzen?")) return; S.fest.final=draft(S.fest); touch(); render(); return; }
-  if(d.sigclr){ S.sig[d.sigclr]=Object.assign(S.sig[d.sigclr]||{}, {img:null}); touch(); render(); return; }
   if(t.id==="btnList"){ await save(); showList(); return; }
   if(t.id==="btnExport"){ exportV(); return; }
   if(t.id==="btnPrint"){ doPrint(); return; }
@@ -655,9 +568,9 @@ document.addEventListener("click", async e=>{
   if(t.id==="vImp"){ $("#fileImport").click(); return; }
   if(d.vopen){ openV(d.vopen); return; }
   if(d.vcopy){ const all=await DB.all(); const v=migrate(all.find(x=>x.id===d.vcopy)); const n=blank();
-    ["flaeche","antName","antAnschrift","schuetze","erlaubnis","standort","gemarkung","flur","flurstueck","koord","tierart","anzahl","sachbearbeiter"].forEach(k=>{ if(v.deck[k]) n.deck[k]=v.deck[k]; });
-    n.fest=JSON.parse(JSON.stringify(v.fest)); n.skizze=JSON.parse(JSON.stringify(v.skizze));
-    S=n; await save(); TAB="deck"; render(); toast("Neuer Vorgang mit Flächenangaben, Skizze und Festlegungen angelegt"); return; }
+    ["flaeche","antName","antAnschrift","schuetze","erlaubnis","standort","gemarkung","flur","flurstueck","koord"].forEach(k=>{ if(v.deck[k]) n.deck[k]=v.deck[k]; });
+    n.skizze=JSON.parse(JSON.stringify(v.skizze));
+    S=n; await save(); TAB="deck"; render(); toast("Neuer Vorgang mit Flächenangaben und Skizze angelegt"); return; }
   if(d.vdel){ const all=await DB.all(); const v=all.find(x=>x.id===d.vdel);
     if(confirm(`Prüfbogen „${v.deck.az||"ohne Aktenzeichen"}“ endgültig von diesem Gerät löschen?\nVorher mit „Sichern“ als Datei speichern, falls noch benötigt.`)){ await DB.del(d.vdel); if(S&&S.id===d.vdel) S=null; showList(); } return; }
 });
@@ -747,25 +660,10 @@ async function initSketch(){
   });
 }
 
-/* Zeichen-/Unterschriftsfelder sperren: gesperrt blättert ein Wischen mit dem Finger die Seite,
+/* Zeichenfläche sperren: gesperrt blättert ein Wischen mit dem Finger die Seite,
    ein Stift (Apple Pencil) zeichnet trotzdem. */
 const LOCK_TXT = "🔒 Gesperrt – antippen zum Zeichnen", UNLOCK_TXT = "✎ Zeichnen aktiv – antippen zum Sperren";
 function isLocked(cv,e){ return cv.parentNode.classList.contains("locked") && e.pointerType!=="pen"; }
-
-/* ---------------------------------------------------------------- Unterschriften */
-function initSigs(){
-  $$("canvas[data-sig]").forEach(cv=>{
-    const key=cv.dataset.sig, ctx=cv.getContext("2d");
-    ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
-    const v=(S.sig[key]||{}).img; if(v){ loadImg(v).then(i=>i&&ctx.drawImage(i,0,0,cv.width,cv.height)); }
-    let drawing=false, last=null, dirty=false;
-    const pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
-    cv.addEventListener("pointerdown",e=>{if(isLocked(cv,e)) return;e.preventDefault();cv.setPointerCapture(e.pointerId);drawing=true;last=pos(e);ctx.fillStyle="#0b1d3a";ctx.beginPath();ctx.arc(last[0],last[1],1.6,0,7);ctx.fill();dirty=true});
-    cv.addEventListener("pointermove",e=>{if(!drawing) return;e.preventDefault();const p=pos(e);ctx.strokeStyle="#0b1d3a";ctx.lineWidth=3.2;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(last[0],last[1]);ctx.lineTo(p[0],p[1]);ctx.stroke();last=p});
-    const end=()=>{ if(!drawing) return; drawing=false; if(dirty){ S.sig[key]=Object.assign(S.sig[key]||{}, {img:cv.toDataURL("image/png")}); touch(); } };
-    cv.addEventListener("pointerup",end); cv.addEventListener("pointercancel",end);
-  });
-}
 
 /* ---------------------------------------------------------------- Sichern */
 function fileName(ext){ const az=(S.deck.az||"ohne-Az").replace(/[^\wäöüÄÖÜß.-]+/g,"_"); return `Pruefbogen_${az}_${S.deck.datum||today()}.${ext}`; }
@@ -785,7 +683,7 @@ async function exportV(){
 /* ---------------------------------------------------------------- Druck / PDF */
 function pHead(title,p){
   const d=S.deck;
-  return `<div class="pt">${esc(title)}</div><div class="pk">Landkreis Jerichower Land · Untere Waffenbehörde · Ortsbesichtigung und sicherheitstechnische Überprüfung vor Erteilung einer Schießerlaubnis nach § 10 Abs. 5 WaffG</div>
+  return `<div class="pt">${esc(title)}</div><div class="pk">Landkreis Jerichower Land · Untere Waffenbehörde · Abnahme des Gatters / der Weide – Ortsbesichtigung nach § 10 Abs. 5 WaffG</div>
 <div class="pz">Aktenzeichen: ${esc(d.az||"____________")} &nbsp;&nbsp; Ortsbesichtigung am: ${esc(dDE(d.datum)||"____________")} &nbsp;&nbsp; Fläche: ${esc(d.standort||"____________")}</div><div class="pp ${p}">${PART_TXT[p]}</div>`;
 }
 const tr=(l,v)=>`<tr><td class="l">${esc(l)}</td><td>${esc(v||"")}</td></tr>`;
@@ -797,9 +695,7 @@ async function doPrint(){
 <tr class="s"><td colspan="2">Verfahren</td></tr>${tr("Aktenzeichen",d.az)}${tr("Art der Fläche",d.flaeche)}${tr("Datum der Ortsbesichtigung",dDE(d.datum))}${tr("Uhrzeit",(d.von||"")+(d.bis?" – "+d.bis:"")+(d.von||d.bis?" Uhr":""))}
 <tr class="s"><td colspan="2">Antragsteller und Schütze</td></tr>${tr("Name des Antragstellers",d.antName)}${tr("Anschrift des Antragstellers",d.antAnschrift)}${tr("Name des Schützen",d.schuetze)}${tr("Waffenrechtliche Erlaubnis des Schützen",d.erlaubnis)}
 <tr class="s"><td colspan="2">Örtlichkeit</td></tr>${tr("Standort des Gatters / der Weide",d.standort)}${tr("Gemarkung",d.gemarkung)}${tr("Flur",d.flur)}${tr("Flurstück(e)",d.flurstueck)}${tr("Koordinaten",d.koord)}
-<tr class="s"><td colspan="2">Tiere und geplante Durchführung</td></tr>${tr("Tierart",d.tierart)}${tr("Anzahl der Tiere",d.anzahl)}${tr("davon zur Erlegung vorgesehen",d.erlegung)}${tr("Geplantes Datum der Schussabgabe",dDE(d.schussDatum))}
-<tr class="s"><td colspan="2">Beteiligte</td></tr>${tr("Teilnehmende Personen",d.teilnehmer)}${tr("Zuständige Sachbearbeiter",d.sachbearbeiter)}${tr("Beteiligung des Veterinäramtes",d.vet)}${tr("Vertreter / Stellungnahme Veterinäramt",d.vetName)}
-</table><p class="pnote">Gliederung: Teil A – Dokumentierte Feststellungen · Teil B – Fachliche Sicherheitsbewertung · Teil C – Behördliche Entscheidung (erfolgt ausschließlich durch gesonderten Bescheid).</p></section>`;
+</table></section>`;
   h+=`<section class="pg">${pHead("2. Checkliste zur Ortsbesichtigung","A")}<table class="p"><tr><th>Nr.</th><th>Prüfpunkt</th><th>Soll</th><th>Ergebnis</th><th>Auswertung</th><th>Bemerkungen</th><th>Festgestellter Mangel</th><th>Erforderliche Maßnahme</th></tr>`;
   CHECK.forEach((sec,si)=>{ h+=`<tr class="s"><td colspan="8">${si+1}. ${esc(sec.sec)}</td></tr>`;
     itemsAll(S).filter(i=>i.sec===sec.sec && (i.text||!sec.extra)).forEach(i=>{ const a=ausw(i);
@@ -829,27 +725,7 @@ ${S.maengel.filter(m=>m.mangel).length? S.maengel.map((m,i)=>m.mangel?`<tr class
 <div class="status ${x.cls}">${esc(x.st)}</div>
 <table class="p" style="margin-top:6px"><tr><th>Bereich</th><th>Prüfpunkte</th><th>Ja</th><th>Nein</th><th>n. z.</th><th>n. gepr.</th><th>Unbeantw.</th><th>Abweichungen</th></tr>
 ${x.secs.concat([x.tot]).map(r=>`<tr${r.sec==="Gesamt"?' class="s"':""}><td>${esc(r.sec)}</td>${["n","ja","nein","nz","ng","offen","abw"].map(k=>`<td>${r[k]}</td>`).join("")}</tr>`).join("")}</table>
-<p class="pnote">Mängel gesamt ${x.M.ges} · offen ${x.M.offen} · erledigt ${x.M.erl} · kritisch offen ${x.M.krit} · Frist überschritten ${x.M.ueber} · Nachkontrolle erforderlich ${x.M.nk}. Bearbeitungsstand Checkliste ${x.prog} %. Der Gesamtstatus ist weder eine Sicherheitsbewertung noch eine Entscheidung.</p></section>`;
-  // Festlegungen
-  const f=S.fest;
-  h+=`<section class="pg">${pHead("6. Festlegungen für die Schießerlaubnis","B")}<table class="p">${tr("Zulässiger Schützenstandort",f.standort)}${tr("Zulässige Schussrichtung",f.richtung)}${tr("Zulässige maximale Schussentfernung",f.entf?f.entf+" m":"")}${tr("Anforderungen an den Kugelfang",f.kugelfang)}${tr("Erforderliche Absperrmaßnahmen",f.absperr)}${tr("Besondere Sicherheitsauflagen",f.auflagen)}${tr("Sonstige Einschränkungen",f.sonst)}</table>
-<table class="p"><tr><th>Sicherheitsauflagen zur Übernahme in den Bescheid</th></tr><tr><td>${esc(f.final||draft(f))}</td></tr></table>
-<p class="pnote">Die Festlegungen sind Vorschläge der prüfenden Mitarbeiter und werden erst durch den Bescheid rechtsverbindlich.</p></section>`;
-  // Bewertung
-  const b=S.bew, p=plaus(S);
-  h+=`<section class="pg">${pHead("7. Abschließende Bewertung (Prüfvermerk)","B")}
-<table class="p"><tr class="s"><td colspan="2">Teil B – Fachliche Sicherheitsbewertung</td></tr>
-<tr><td class="l">Prüfvermerk</td><td>${L.vermerk.map(v=>`${b.vermerk===v?"☒":"☐"} ${esc(v)}`).join("<br>")}</td></tr>
-${p.w?tr("Plausibilitätshinweis",p.t):""}${tr("Begründung",b.begr)}${tr("Offene Punkte",b.offen)}${tr("Weitere erforderliche Prüfungen",b.weitere)}</table>
-<p class="pnote">Der Prüfvermerk ist eine fachliche Stellungnahme zur Sicherheit der Schussabgabe. Er ersetzt nicht die rechtliche Prüfung und Entscheidung über den Antrag und begründet keinen Anspruch auf Erteilung.</p>
-<div class="pp C">Teil C – Behördliche Entscheidung (nur Verweis – Entscheidung erfolgt durch gesonderten Bescheid)</div>
-<table class="p">${tr("Stand der Entscheidung",b.entsch)}${tr("Datum des Bescheids",dDE(b.bDatum))}${tr("Aktenzeichen / Bezug des Bescheids",b.bAz)}${tr("Entscheidung gezeichnet durch",b.bDurch)}</table></section>`;
-  // Unterschriften
-  const sg=S.sig, sb=(k,t,txt)=>{const v=sg[k]||{};return `<table class="p"><tr class="s"><td colspan="2">${esc(t)}</td></tr>${txt?`<tr><td colspan="2" style="font-style:italic">${esc(txt)}</td></tr>`:""}${tr("Name",v.name)}<tr><td class="l">Unterschrift</td><td><div class="sigp">${v.img?`<img src="${v.img}" alt="">`:""}</div></td></tr></table>`};
-  h+=`<section class="pg">${pHead("8. Unterschriften","N")}<table class="p">${tr("Ort",sg.ort)}${tr("Datum",dDE(sg.datum))}</table>
-${sb("p1","Prüfender Mitarbeiter der unteren Waffenbehörde")}${sb("p2","Weiterer Mitarbeiter der unteren Waffenbehörde")}
-${sb("ant","Antragsteller – Bestätigung der besprochenen örtlichen Festlegungen","Mir wurden die vor Ort besprochenen örtlichen Festlegungen (Schützenstandort, Schussrichtung, maximale Schussentfernung, Kugelfang, Absperrmaßnahmen) erläutert. Diese Bestätigung ist keine Genehmigung; über den Antrag wird gesondert durch Bescheid entschieden.")}
-<table class="p">${tr("Datenschutzinformation nach Art. 13 DSGVO ausgehändigt",sg.art13)}</table></section>`;
+<p class="pnote">Mängel gesamt ${x.M.ges} · offen ${x.M.offen} · erledigt ${x.M.erl} · kritisch offen ${x.M.krit} · Frist überschritten ${x.M.ueber} · Nachkontrolle erforderlich ${x.M.nk}. Bearbeitungsstand Checkliste ${x.prog} %. Der Gesamtstatus ist eine rechnerische Zusammenfassung der Feststellungen.</p></section>`;
   $("#print").innerHTML=h;
   const prevTitle=document.title; document.title=fileName("pdf").replace(/\.pdf$/,"");
   await Promise.all($$("#print img").map(i=>i.complete?0:new Promise(r=>{i.onload=i.onerror=r})));

@@ -1,6 +1,6 @@
 # Prüfbogen Ortsbesichtigung (§ 10 Abs. 5 WaffG)
 
-Offline-App für die Ortsbesichtigung von Wildgattern und Weideflächen vor Erteilung einer Schießerlaubnis.
+Offline-App für die Abnahme von Wildgattern und Weideflächen (Ortsbesichtigung, § 10 Abs. 5 WaffG): Deckblatt, Checkliste, Skizze, Fotos, Mängel, Übersicht.
 Adresse: https://kumigo.github.io/waffenkontrolle/pruefbogen/
 
 **iPad einrichten (einmalig, mit WLAN):** Adresse bzw. QR-Code in Safari öffnen → Teilen → „Zum Home-Bildschirm“.
