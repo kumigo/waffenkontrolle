@@ -12612,7 +12612,6 @@ const CHECK = [
   {sec:"Schussrichtung und Kugelfang", items:[
     ["2.1","Zulässige Schussrichtung festgelegt","Ja"],
     ["2.2","Geeigneter natürlicher oder künstlicher Kugelfang vorhanden","Ja"],
-    ["2.3","Fehl- und Durchschüsse berücksichtigt","Ja"],
     ["2.4","Gefahr durch Geschossabpraller geprüft","Ja"],
     ["2.5","Angrenzende Straßen und Wege berücksichtigt","Ja"],
     ["2.6","Angrenzende Grundstücke und Gebäude berücksichtigt","Ja"],
@@ -12622,8 +12621,6 @@ const CHECK = [
     ["3.1","Gefahrenbereich eindeutig festgelegt","Ja"],
     ["3.2","Absperrmaßnahmen erforderlich","Info"],
     ["3.3","Absperrmaßnahmen ausreichend","Ja"],
-    ["3.4","Öffentliche Wege betroffen","Info"],
-    ["3.5","Warn- oder Sicherungspersonal erforderlich","Info"],
     ["3.6","Ausreichende Sichtverhältnisse möglich","Ja"]]},
   {sec:"Durchführung", items:[
     ["4.1","Schussentfernung festgelegt","Ja"],
@@ -12724,11 +12721,11 @@ async function save(){
 /* ---------------------------------------------------------------- Auswertung */
 function itemsAll(s){
   const out=[];
-  CHECK.forEach(sec=>sec.items.forEach(([nr,text,soll])=>{
+  CHECK.forEach((sec,si)=>sec.items.forEach(([nr,text,soll],ii)=>{
     const r=s.check[K(nr)]||{};
     const t = sec.extra? (r.text||"") : text;
     const so = r.soll!==undefined && r.soll!=="" ? r.soll : soll;
-    out.push({nr,text:t,soll:so,sec:sec.sec,extra:!!sec.extra,r});
+    out.push({nr,disp:(si+1)+"."+(ii+1),text:t,soll:so,sec:sec.sec,extra:!!sec.extra,r});
   }));
   return out;
 }
@@ -12804,7 +12801,7 @@ ${fText("Waffenrechtliche Erlaubnis des Schützen (Art, Nummer, Behörde)","deck
 </div>
 <h3>Örtlichkeit</h3><div class="grid">
 ${fText("Standort des Gatters / der Weide (Bezeichnung, Lage)","deck.standort",{wide:true})}
-${fText("Gemarkung","deck.gemarkung")}${fText("Flur","deck.flur")}${fText("Flurstück(e)","deck.flurstueck")}${fText("Koordinaten (optional)","deck.koord")}
+${fText("Gemarkung","deck.gemarkung")}${fText("Flur","deck.flur")}${fText("Flurstück(e)","deck.flurstueck")}
 </div>`;
 
 VIEWS.check = ()=>{
@@ -12821,7 +12818,7 @@ function ciHTML(nr){
   const has = r.bem||r.mangel||r.mass;
   const sollSel = `<span class="soll">Soll: <select data-k="check.${K(nr)}.soll">${(it.extra?[""]:[]).concat(["Ja","Nein","Info"]).map(x=>`<option value="${x}"${x===it.soll?" selected":""}>${x||"–"}</option>`).join("")}</select></span>`;
   return `<div class="ci${has?" has":""}" data-ci="${nr}">
-  <div class="h"><span class="nr">${nr}</span>
+  <div class="h"><span class="nr">${it.disp}</span>
     <span class="t">${it.extra? `<input type="text" data-k="check.${K(nr)}.text" value="${esc(r.text||"")}" placeholder="Weiteren Prüfpunkt eintragen">` : esc(it.text)}</span>
     ${sollSel}
     <span class="seg">${ERG.map(e=>`<button data-erg="${esc(e)}" class="${r.e===e?"on":""}">${ERG_SHORT[e]}</button>`).join("")}</span>
@@ -12839,7 +12836,7 @@ function ciHTML(nr){
 VIEWS.skizze = ()=> {
   const sk=S.skizze;
   return `${part("A")}<h2>3. Skizze und Lageplan</h2>${ctxLine()}
-<div class="grid">${fSel("Art der Darstellung","skizze.art",L.darst)}${fText("Maßstab (ca.)","skizze.massstab")}
+<div class="grid">${fSel("Art der Darstellung","skizze.art",L.darst)}
 ${fText("Nordrichtung / Ausrichtung","skizze.nord")}${fText("Quelle / Nutzungshinweis Kartengrundlage","skizze.quelle")}</div>
 <h3>Zeichenfläche</h3>
 <div class="sk-tools" id="skTools">
@@ -12905,7 +12902,7 @@ ${x.secs.concat([x.tot]).map(r=>`<tr class="${r.sec==="Gesamt"?"sum":""}"><td>${
 <tr><td>davon erledigt</td><td class="n"><b>${x.M.erl}</b></td></tr><tr><td>Kritische Mängel, nicht erledigt</td><td class="n"><b>${x.M.krit}</b></td></tr>
 <tr><td>Offene Mängel mit überschrittener Frist</td><td class="n"><b>${x.M.ueber}</b></td></tr><tr><td>Nachkontrolle erforderlich</td><td class="n"><b>${x.M.nk}</b></td></tr></table></div>
 <h3>Abweichungen und nicht geprüfte Punkte aus der Checkliste</h3>
-${x.auff.length? `<div class="tw"><table class="t"><tr><th>Nr. / Prüfpunkt</th><th>Ergebnis</th><th>Auswertung</th><th>Mangel / Bemerkung</th></tr>${x.auff.map(i=>`<tr><td>${i.nr} ${esc(i.text)}</td><td>${esc(i.r.e)}</td><td><span class="aw ${AW_CLS[ausw(i)]}">${ausw(i)}</span></td><td>${esc(i.r.mangel||i.r.bem||"")}</td></tr>`).join("")}</table></div>` : '<p class="note">Keine.</p>'}
+${x.auff.length? `<div class="tw"><table class="t"><tr><th>Nr. / Prüfpunkt</th><th>Ergebnis</th><th>Auswertung</th><th>Mangel / Bemerkung</th></tr>${x.auff.map(i=>`<tr><td>${i.disp} ${esc(i.text)}</td><td>${esc(i.r.e)}</td><td><span class="aw ${AW_CLS[ausw(i)]}">${ausw(i)}</span></td><td>${esc(i.r.mangel||i.r.bem||"")}</td></tr>`).join("")}</table></div>` : '<p class="note">Keine.</p>'}
 <h3>Offene Mängel</h3>
 ${om.length? `<div class="tw"><table class="t"><tr><th>Nr. / Mangel</th><th>Relevanz</th><th>Frist</th><th>Status</th><th>Maßnahme</th><th>Verantwortlich</th></tr>${om.map(({m,i})=>`<tr style="background:${m.rel==="Kritisch"?"var(--bad)":"var(--warn)"}"><td>${i+1}. ${esc(m.mangel)}</td><td>${esc(m.rel||"")}</td><td class="${mOverdue(m)?"overdue":""}">${esc(dDE(m.frist))}</td><td>${esc(mStatus(m))}</td><td>${esc(m.mass||"")}</td><td>${esc(m.verantw||"")}</td></tr>`).join("")}</table></div>` : '<p class="note">Keine offenen Mängel.</p>'}`;
 };
@@ -12979,7 +12976,7 @@ document.addEventListener("click", async e=>{
   if(d.lock){ const w = $(".cwrap");
     const l=w.classList.toggle("locked"); t.textContent = l? LOCK_TXT : UNLOCK_TXT; t.classList.toggle("on",!l); return; }
   if(d.tomangel){ const it=itemsAll(S).find(i=>i.nr===d.tomangel); if(!it.text){toast("Bitte zuerst den Prüfpunkt eintragen.");return;}
-    S.maengel.push({mangel:`${it.nr} ${it.text}: ${it.r.mangel||it.r.bem||"Abweichung festgestellt"}`,mass:it.r.mass||"",status:"Offen"}); touch(); toast(`Als Mangel Nr. ${S.maengel.length} übernommen`); return; }
+    S.maengel.push({mangel:`${it.disp} ${it.text}: ${it.r.mangel||it.r.bem||"Abweichung festgestellt"}`,mass:it.r.mass||"",status:"Offen"}); touch(); toast(`Als Mangel Nr. ${S.maengel.length} übernommen`); return; }
   if(t.id==="mAdd"){ S.maengel.push({status:"Offen"}); touch(); render(); setTimeout(()=>{const a=$$("[data-mrow]").pop(); a&&a.scrollIntoView({behavior:"smooth"}); const ta=a&&a.querySelector("textarea"); ta&&ta.focus()},50); return; }
   if(d.mdel!==undefined){ if(confirm(`Mangel Nr. ${+d.mdel+1} löschen?`)){ S.maengel.splice(+d.mdel,1); touch(); render(); } return; }
   if(d.phdel!==undefined){ if(confirm(`Bild ${+d.phdel+1} löschen?`)){ S.fotos.splice(+d.phdel,1); touch(); render(); } return; }
@@ -12992,7 +12989,7 @@ document.addEventListener("click", async e=>{
   if(t.id==="vQr"){ qrEmpfangen(); return; }
   if(d.vopen){ openV(d.vopen); return; }
   if(d.vcopy){ const all=await DB.all(); const v=migrate(all.find(x=>x.id===d.vcopy)); const n=blank();
-    ["flaeche","antName","antAnschrift","schuetze","erlaubnis","standort","gemarkung","flur","flurstueck","koord"].forEach(k=>{ if(v.deck[k]) n.deck[k]=v.deck[k]; });
+    ["flaeche","antName","antAnschrift","schuetze","erlaubnis","standort","gemarkung","flur","flurstueck"].forEach(k=>{ if(v.deck[k]) n.deck[k]=v.deck[k]; });
     n.skizze=JSON.parse(JSON.stringify(v.skizze));
     S=n; await save(); TAB="deck"; render(); toast("Neuer Vorgang mit Flächenangaben und Skizze angelegt"); return; }
   if(d.vdel){ const all=await DB.all(); const v=all.find(x=>x.id===d.vdel);
@@ -13118,20 +13115,20 @@ async function doPrint(){
   h+=`<section class="pg">${pHead("1. Allgemeine Angaben (Deckblatt)","A")}<table class="p">
 <tr class="s"><td colspan="2">Verfahren</td></tr>${tr("Aktenzeichen",d.az)}${tr("Art der Fläche",d.flaeche)}${tr("Datum der Ortsbesichtigung",dDE(d.datum))}${tr("Uhrzeit",(d.von||"")+(d.bis?" – "+d.bis:"")+(d.von||d.bis?" Uhr":""))}
 <tr class="s"><td colspan="2">Antragsteller und Schütze</td></tr>${tr("Name des Antragstellers",d.antName)}${tr("Anschrift des Antragstellers",d.antAnschrift)}${tr("Name des Schützen",d.schuetze)}${tr("Waffenrechtliche Erlaubnis des Schützen",d.erlaubnis)}
-<tr class="s"><td colspan="2">Örtlichkeit</td></tr>${tr("Standort des Gatters / der Weide",d.standort)}${tr("Gemarkung",d.gemarkung)}${tr("Flur",d.flur)}${tr("Flurstück(e)",d.flurstueck)}${tr("Koordinaten",d.koord)}
+<tr class="s"><td colspan="2">Örtlichkeit</td></tr>${tr("Standort des Gatters / der Weide",d.standort)}${tr("Gemarkung",d.gemarkung)}${tr("Flur",d.flur)}${tr("Flurstück(e)",d.flurstueck)}
 </table></section>`;
   h+=`<section class="pg">${pHead("2. Checkliste zur Ortsbesichtigung","A")}<table class="p"><tr><th>Nr.</th><th>Prüfpunkt</th><th>Soll</th><th>Ergebnis</th><th>Auswertung</th><th>Bemerkungen</th><th>Festgestellter Mangel</th><th>Erforderliche Maßnahme</th></tr>`;
   CHECK.forEach((sec,si)=>{ const its=itemsAll(S).filter(i=>i.sec===sec.sec && (i.text||!sec.extra)); if(!its.length) return;
     h+=`<tr class="s"><td colspan="8">${si+1}. ${esc(sec.sec)}</td></tr>`;
     its.forEach(i=>{ const a=ausw(i);
-      h+=`<tr><td>${i.nr}</td><td>${esc(i.text)}</td><td>${esc(i.soll)}</td><td>${esc(i.r.e||"")}</td><td><span class="aw ${AW_CLS[a]||""}">${esc(a)}</span></td><td>${esc(i.r.bem||"")}</td><td>${esc(i.r.mangel||"")}</td><td>${esc(i.r.mass||"")}</td></tr>`; });
+      h+=`<tr><td>${i.disp}</td><td>${esc(i.text)}</td><td>${esc(i.soll)}</td><td>${esc(i.r.e||"")}</td><td><span class="aw ${AW_CLS[a]||""}">${esc(a)}</span></td><td>${esc(i.r.bem||"")}</td><td>${esc(i.r.mangel||"")}</td><td>${esc(i.r.mass||"")}</td></tr>`; });
   });
   h+=`</table><p class="pnote">Soll = sicherheitstechnisch erwartete Antwort; „Info“ = Sachverhaltsangabe. Die Auswertung ist eine rechnerische Hilfe und keine Sicherheitsbewertung.</p></section>`;
   // Skizze
   const sk=S.skizze, hatSkizze = sk.items.length || sk.bg;
   let skImg="";
   if(hatSkizze){ const c=document.createElement("canvas"); c.width=1600; c.height=1100; drawSketch(c.getContext("2d"),sk,await loadImg(sk.bg)); skImg=c.toDataURL("image/jpeg",0.9); }
-  const skAng=[["Art der Darstellung",sk.art],["Maßstab (ca.)",sk.massstab],["Nordrichtung / Ausrichtung",sk.nord],["Quelle / Nutzungshinweis",sk.quelle]].filter(a=>a[1]);
+  const skAng=[["Art der Darstellung",sk.art],["Nordrichtung / Ausrichtung",sk.nord],["Quelle / Nutzungshinweis",sk.quelle]].filter(a=>a[1]);
   const skWerte=SK_LEG.filter(([k])=>getP(S,`skizze.legend.${k}.wert`));
   h+=`<section class="pg">${pHead("3. Skizze und Lageplan","A")}
 ${skAng.length?`<table class="p">${skAng.map(a=>tr(a[0],a[1])).join("")}</table>`:""}
