@@ -1,7 +1,7 @@
 /* Prüfbogen Ortsbesichtigung – Offline-Zwischenspeicher.
    Speichert nur die Programmdateien. Eingaben, Fotos und Unterschriften liegen
    ausschließlich im Browser-Speicher des Geräts und werden nie übertragen. */
-const CACHE = "pruefbogen-v4";
+const CACHE = "pruefbogen-v5";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-512.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
