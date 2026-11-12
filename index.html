@@ -144,6 +144,9 @@
   .person .info { flex:1; min-width:0; }
   .person .info b { font-size:17px; }
   .person .info .az { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:6px; background:#e8eef7; color:#1f4f8a; font-size:14px; font-weight:600; vertical-align:2px; }
+  .person .info .az.rot { background:#fde4e1; color:#b3261e; }
+  .person .info .vv-box b, .vv-box b { font-size:13px; display:inline; }
+  .vv-box { margin:6px 0 0; padding:6px 10px; border-radius:6px; background:#fde4e1; color:#8c1d16; font-size:13px; }
   .person .info .zeile2 { color:var(--muted); font-size:14px; }
   .person .aktionen { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
   .fortschritt { height:8px; background:#e3e8ef; border-radius:4px; overflow:hidden; margin:6px 0 14px; }
@@ -12999,7 +13002,19 @@ var qrcode = function() {
     if (!d.items.length && !docs.length) throw new Error("Keine Erlaubnisse/Waffen gefunden – ist das ein NWR-Auszug „Personendaten“?");
     return d;
   }
-  function auswerten(seiten) { return istPersonendaten(seiten) ? personendatenAuswerten(seiten) : stammdatenAuswerten(seiten); }
+  function auswerten(seiten) {
+    var d = istPersonendaten(seiten) ? personendatenAuswerten(seiten) : stammdatenAuswerten(seiten);
+    // Hinweis auf einen Verwahrvertrag (Waffen einer anderen Person hier verwahrt bzw. eigene Waffen bei anderen): ganze Zeile merken
+    var hinweise = [];
+    seiten.forEach(function (seite) {
+      zeilen(seite.words).forEach(function (z) {
+        var t = text(z.ws);
+        if (/verwahr/i.test(t) && hinweise.indexOf(t) < 0) hinweise.push(t);
+      });
+    });
+    if (hinweise.length) d.verwahrvertrag = hinweise;
+    return d;
+  }
   // Vorbelegung für die Aufbewahrung aus den Behältnisdaten
   function behaeltnisVorbelegung(d) {
     var b = (d && d.behaeltnisse) || [];
@@ -14262,9 +14277,10 @@ var qrcode = function() {
           '<button class="btn sec klein" data-akt="drucken" data-i="' + i + '">🖨 Drucken</button>'
         : routeLinks(adr, true) + '<button class="btn klein" data-akt="start" data-i="' + i + '">' + (p.status === "begonnen" ? "Fortsetzen" : "Kontrolle starten") + "</button>";
       return '<li class="person ' + cls + '"><div class="status">' + symbol + '</div>' +
-        '<div class="info"><b>' + esc(d.person[0] || "") + '</b>' + (WK.aktenzeichenAus(d) ? ' <span class="az">Az. ' + esc(WK.aktenzeichenAus(d)) + '</span>' : "") +
+        '<div class="info"><b>' + esc(d.person[0] || "") + '</b>' + (WK.aktenzeichenAus(d) ? ' <span class="az">Az. ' + esc(WK.aktenzeichenAus(d)) + '</span>' : "") + (d.verwahrvertrag ? ' <span class="az rot" title="' + esc(d.verwahrvertrag.join(" | ")) + '">Verwahrvertrag</span>' : "") +
         '<div class="zeile2">' + esc(adr) + "</div>" +
-        '<div class="zeile2">' + anz + " Waffe(n) · Dok-Nr. " + esc(d.dok_nr || "") + "</div>" + zeile3 + "</div>" +
+        '<div class="zeile2">' + anz + " Waffe(n) · Dok-Nr. " + esc(d.dok_nr || "") + "</div>" + zeile3 +
+        (d.verwahrvertrag ? '<div class="vv-box"><b>Verwahrvertrag:</b> ' + esc(d.verwahrvertrag.join(" · ")) + ' – andere Person ggf. direkt mit kontrollieren.</div>' : "") + "</div>" +
         '<div class="aktionen">' + akt + '<button class="x" title="Aus Liste entfernen" data-akt="weg" data-i="' + i + '">×</button></div></li>';
     }).join("");
   }
@@ -14673,7 +14689,7 @@ var qrcode = function() {
       '<dt>Dok-Nr.</dt><dd>' + esc(d.dok_nr || "") + '</dd>' +
       '<dt>Behörde</dt><dd>' + esc(d.behoerde || "") + '</dd>' +
       '<dt>Person-NWR-ID</dt><dd>' + esc(d.person_nwr || "") + '</dd>' +
-      '</dl>' + (adr ? '<div class="route">' + routeLinks(adr, true) + '</div>' +
+      '</dl>' + (d.verwahrvertrag ? '<div class="vv-box" style="margin:8px 0"><b>Verwahrvertrag:</b> ' + esc(d.verwahrvertrag.join(" · ")) + '</div>' : "") + (adr ? '<div class="route">' + routeLinks(adr, true) + '</div>' +
         '<p class="klein muted" style="margin:8px 0 0">Erst beim Antippen wird die Adresse an Apple Karten übergeben.</p>' : "") +
       '</div>' +
       '<div class="card"><h3>Kontrolle</h3>' +
