@@ -57,6 +57,9 @@
   .zeile .was > span { display:block; }
   .dok-kopf { margin:18px 2px 8px; padding:8px 12px; border-left:4px solid var(--accent, #1f5fa8); background:#f3f6fa; border-radius:6px; }
   .dok-kopf span { display:block; }
+  .dok-kopf.standard { border-left-color:#1e7e3e; background:#e6f5e9; }
+  .dok-kopf.sport { border-left-color:#c9a400; background:#fff6cc; }
+  .dok-kopf.verein { border-left-color:#d96a0b; background:#ffe9d4; }
   .teil { padding-left:18px; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip { border:1px solid #b9c4d2; background:#fff; border-radius:999px; padding:10px 16px; min-height:44px; font-size:15px; font-weight:600; color:var(--muted); cursor:pointer; }
@@ -13333,19 +13336,25 @@ var qrcode = function() {
     }
     tabKopf();
     var zh = 30;
-    var letzteDok = null;
+    var letzteDok = null, ersteZeile = true;
+    var WBK_FARBE = { standard: [rgb(0.89, 0.96, 0.90), rgb(0.12, 0.50, 0.24)], sport: [rgb(1, 0.97, 0.80), rgb(0.62, 0.50, 0.02)], verein: [rgb(1, 0.91, 0.82), rgb(0.80, 0.40, 0.04)] };
     d.items.forEach(function (it, k) {
-      var idx = k + 1, pos = ("0" + idx).slice(-2);
+      var idx = k + 1, pos = ("0" + idx).slice(-2), aktiv = positionAktiv(it, WERTE);
       if (y - zh - (it.dok_nr && it.dok_nr !== letzteDok ? 16 : 0) < 30 * mm) { neueSeite(); tabKopf(); }
       if (it.dok_nr && it.dok_nr !== letzteDok) {
-        // Zwischenzeile: auf welcher Erlaubnis (WBK) die folgenden Waffen eingetragen sind
+        // Zwischenzeile: auf welcher Erlaubnis (WBK) die folgenden Waffen eingetragen sind – farbig nach Art der WBK
         letzteDok = it.dok_nr;
-        page.drawRectangle({ x: RAND, y: y - 14, width: W - 2 * RAND, height: 14, color: rgb(0.97, 0.975, 0.985) });
-        txt(RAND + 3, y - 10, fit("Eingetragen auf: " + (it.dok_art || "Erlaubnis") + ", Dokument Nr. " + it.dok_nr, F.b, 8, W - 2 * RAND - 6), F.b, 8, DUNKEL);
+        var fa = WBK_FARBE[wbkTyp(it.dok_art)];
+        page.drawRectangle({ x: RAND, y: y - 14, width: W - 2 * RAND, height: 14, color: fa[0] });
+        page.drawRectangle({ x: RAND, y: y - 14, width: 3, height: 14, color: fa[1] });
+        txt(RAND + 7, y - 10, fit("Eingetragen auf: " + (it.dok_art || "Erlaubnis") + ", Dokument Nr. " + it.dok_nr +
+          (aktiv ? "" : " – Waffen nicht bei dieser Person, nicht kontrolliert"), F.b, 8, W - 2 * RAND - 10), F.b, 8, DUNKEL);
         y -= 16;
       }
+      if (!aktiv) return;
       var haupt = !!it.nr, t = y, fb = haupt ? F.b : F.n, einr = haupt ? 0 : 8;
-      if (haupt && idx > 1) linie(RAND, t + 2, W - RAND, t + 2, 0.8, DUNKEL);
+      if (haupt && !ersteZeile) linie(RAND, t + 2, W - RAND, t + 2, 0.8, DUNKEL);
+      ersteZeile = false;
       txt(xs[0] + 3, t - 10, it.nr, F.b, 9);
       txt(xs[1] + 3 + einr, t - 10, fit(it.art, fb, 8.5, cols[1][1] - 6 - einr), fb, 8.5);
       txt(xs[1] + 3 + einr, t - 21, fit(it.waffenart + (it.kategorie ? " (Kat. " + it.kategorie + ")" : ""), F.n, 7.5, cols[1][1] - 6 - einr), F.n, 7.5, DUNKEL);
@@ -13367,14 +13376,14 @@ var qrcode = function() {
       linie(RAND, t - zh + 1, W - RAND, t - zh + 1, 0.3, LINIE);
       y -= zh;
     });
-    if (S && d.items.some(function (it, k) { var v = String(WERTE["pos" + ("0" + (k + 1)).slice(-2) + "_sn_neu"] || "").trim(); return v && v !== it.seriennr; })) {
+    if (S && d.items.some(function (it, k) { var v = String(WERTE["pos" + ("0" + (k + 1)).slice(-2) + "_sn_neu"] || "").trim(); return positionAktiv(it, WERTE) && v && v !== it.seriennr; })) {
       txt(RAND, y - 9, "Rot: bei der Kontrolle festgestellte, abweichende Seriennummer (alte Angabe laut Stammdatenblatt durchgestrichen).", F.i, 7, ROT);
       y -= 12;
     }
     y -= 12;
 
     // ---- Munition je Kaliber
-    var kl = kaliberListe(d), kaliber = kl.kaliber, kalNr = kl.kalNr;
+    var kl = kaliberListe(d, WERTE), kaliber = kl.kaliber, kalNr = kl.kalNr;
     var EXTRA_KALIBER = 3, mzh = 22;
     var mcols = [["Kaliber", 220], ["Ja", 30], ["Nein", 30]];
     var mxs = [RAND];
@@ -13388,17 +13397,18 @@ var qrcode = function() {
       txt(mxs[1] + 3, y - 22, "vorhanden?", F.i, 6.5, GRAU);
       y -= 24;
     }
-    if (y - (48 + (kaliber.length + EXTRA_KALIBER) * mzh) < 20 * mm) neueSeite();
+    if (y - (48 + (kaliber.length - Object.keys(kl.aus).length + EXTRA_KALIBER) * mzh) < 20 * mm) neueSeite();
     munKopf();
-    var mzeilen = kaliber.map(function (k) { return { k: k }; });
+    var mzeilen = kaliber.map(function (k, i) { return { k: k, nr: ("0" + (i + 1)).slice(-2) }; }).filter(function (z) { return !kl.aus[z.k]; });
+    var anzKal = mzeilen.length;
     for (var e = 0; e < EXTRA_KALIBER; e++) {
       var enr = ("0" + (kaliber.length + e + 1)).slice(-2);
       if (!S || (WERTE["mun" + enr + "_kaliber"] || "").trim()) mzeilen.push({ k: null, nr: enr });
     }
     mzeilen.forEach(function (z, i) {
-      var nr = z.nr || ("0" + (i + 1)).slice(-2);
+      var nr = z.nr;
       if (y - mzh < 20 * mm) { neueSeite(); munKopf(); }
-      if (!z.k && i === kaliber.length && i > 0) {
+      if (!z.k && i === anzKal && i > 0) {
         y -= 9;
         txt(mxs[0] + 3, y + 1, "weitere Kaliber:", F.i, 6.5, GRAU);
       }
@@ -13640,16 +13650,40 @@ var qrcode = function() {
     return sha256js(bytes);
   }
 
-  function kaliberListe(d) {
-    var kaliber = [], kalNr = {};
-    d.items.forEach(function (it) {
+  // Art der Erlaubnis: Standard-WBK grün, Sportschützen-WBK gelb, Vereins-WBK orange
+  function wbkTyp(art) {
+    art = String(art || "");
+    if (/verein/i.test(art)) return "verein";
+    if (/sport/i.test(art)) return "sport";
+    return "standard";
+  }
+  function wbkSchluessel(dokNr) { return "wbk_hier_" + String(dokNr || "").replace(/[^A-Za-z0-9]/g, "_"); }
+  // Waffen einer Vereins-WBK zählen nur, wenn bei der Kontrolle bestätigt wurde, dass sie hier sind
+  function positionAktiv(it, werte) {
+    return !(it && it.dok_nr && wbkTyp(it.dok_art) === "verein") || (werte || {})[wbkSchluessel(it.dok_nr)] === "Ja";
+  }
+  // Reihenfolge der Kaliber bleibt stabil (mun01, mun02 …): erst Kaliber normaler Waffen, dann nur von Vereinswaffen; ausgeblendete in "aus"
+  function kaliberListe(d, werte) {
+    var kaliber = [], kalNr = {}, aus = {}, nurVerein = [];
+    function nimm(it, ziel) {
       var k = (it.kaliber || "").trim();
       if (!k || /^ohne$/i.test(k)) return;
-      if (!kalNr[k]) { kalNr[k] = []; kaliber.push(k); }
+      if (!kalNr[k]) { kalNr[k] = []; ziel.push(k); }
+    }
+    d.items.forEach(function (it) { if (!(it.dok_nr && wbkTyp(it.dok_art) === "verein")) nimm(it, kaliber); });
+    d.items.forEach(function (it) { if (it.dok_nr && wbkTyp(it.dok_art) === "verein") nimm(it, nurVerein); });
+    kaliber = kaliber.concat(nurVerein);
+    var anzahl = {};
+    d.items.forEach(function (it) {
+      if (!positionAktiv(it, werte)) return;
+      var k = (it.kaliber || "").trim();
+      if (!k || /^ohne$/i.test(k)) return;
+      anzahl[k] = 1;
       var nrT = it.nrText || it.gruppe;
       if (nrT && kalNr[k].indexOf(nrT) < 0) kalNr[k].push(nrT);
     });
-    return { kaliber: kaliber, kalNr: kalNr };
+    kaliber.forEach(function (k) { if (!anzahl[k]) aus[k] = true; });
+    return { kaliber: kaliber, kalNr: kalNr, aus: aus };
   }
 
   async function lesen(pdfjs, bytes) {
@@ -13879,7 +13913,7 @@ var qrcode = function() {
   }
 
   global.Waffenkontrolle = { sha256js: sha256js, verarbeiten: verarbeiten, einfrieren: einfrieren, lesen: lesen, abschliessen: abschliessen,
-    kaliberListe: kaliberListe, dateiname: dateiname, kostenbescheid: kostenbescheid, bescheidFelder: bescheidFelder, aktenzeichenAus: aktenzeichenAus, behaeltnisVorbelegung: behaeltnisVorbelegung, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, GRUENDE: GRUENDE, EXTRA_KALIBER: 3 };
+    kaliberListe: kaliberListe, wbkTyp: wbkTyp, wbkSchluessel: wbkSchluessel, positionAktiv: positionAktiv, dateiname: dateiname, kostenbescheid: kostenbescheid, bescheidFelder: bescheidFelder, aktenzeichenAus: aktenzeichenAus, behaeltnisVorbelegung: behaeltnisVorbelegung, FRAGEN: FRAGEN, FRAGEN_START: FRAGEN_START, GRUENDE: GRUENDE, EXTRA_KALIBER: 3 };
 })(typeof window !== "undefined" ? window : globalThis);
 
 </script>
@@ -14502,7 +14536,7 @@ var qrcode = function() {
           if (sigUrl[k]) sigBytes[k] = unb64(sigUrl[k].split(",")[1]);
         });
         var vw = e.werte.zugang === "Nein" || e.werte.zugang === "NA";
-        var fehlend = vw ? 0 : p.daten.items.filter(function (it, j) { return e.werte["pos" + pos(j) + "_vorhanden"] === "Nein"; }).length;
+        var fehlend = vw ? 0 : p.daten.items.filter(function (it, j) { return WK.positionAktiv(it, e.werte) && e.werte["pos" + pos(j) + "_vorhanden"] === "Nein"; }).length;
         var r = await WK.abschliessen(PDFLib, p.daten, null, e.werte, sigBytes, { anlage: false, logo: logoBytes() });
         p.werte = e.werte; p.bescheid = null; p.bescheidName = null;
         if (bescheidMoeglich(p)) { var kb = await bescheidBauen(p, e.werte); p.bescheid = kb.bytes; p.bescheidName = kb.name; }
@@ -14567,9 +14601,9 @@ var qrcode = function() {
     WK.FRAGEN_START.forEach(function (f) { if (!w[f[0]]) o.start++; });
     if (!w.zugang) o.start++;
     if (w.zugang === "Nein" || w.zugang === "NA") { if (w.zugang === "Nein" && !w.frage02) o.verstoss++; if (!st.sig.kontrolleur) o.sig++; return o; }
-    d.items.forEach(function (it, i) { if (!w["pos" + pos(i) + "_vorhanden"]) o.waffen++; });
-    var kl = WK.kaliberListe(d);
-    kl.kaliber.forEach(function (k, i) { if (!w["mun" + pos(i) + "_vorhanden"]) o.munition++; });
+    d.items.forEach(function (it, i) { if (WK.positionAktiv(it, w) && !w["pos" + pos(i) + "_vorhanden"]) o.waffen++; });
+    var kl = WK.kaliberListe(d, w);
+    kl.kaliber.forEach(function (k, i) { if (!kl.aus[k] && !w["mun" + pos(i) + "_vorhanden"]) o.munition++; });
     for (var e = 0; e < WK.EXTRA_KALIBER; e++) {
       var n = pos(kl.kaliber.length + e);
       if ((w["mun" + n + "_kaliber"] || "").trim() && !w["mun" + n + "_vorhanden"]) o.munition++;
@@ -14736,8 +14770,14 @@ var qrcode = function() {
       var h = g.items[0].it, haupt = g.items[0].it.nr ? [g.items[0]] : [], teile = g.items.slice(haupt.length);
       if (h.dok_nr && h.dok_nr !== letzteDok) {
         letzteDok = h.dok_nr;
-        html += '<div class="dok-kopf"><span class="muted klein">Eingetragen auf</span><b>' + esc(h.dok_art || "Erlaubnis") + '</b> · Dokument Nr. ' + esc(h.dok_nr) + '</div>';
+        var typ = WK.wbkTyp(h.dok_art), aktiv = WK.positionAktiv(h, st.werte);
+        var anzW = gruppen.filter(function (x) { return x.items[0].it.dok_nr === h.dok_nr; }).length;
+        html += '<div class="dok-kopf ' + typ + '"><span class="muted klein">Eingetragen auf' + (typ === "verein" ? " (Vereins-WBK)" : typ === "sport" ? " (Sportschützen-WBK)" : "") + '</span><b>' + esc(h.dok_art || "Erlaubnis") + '</b> · Dokument Nr. ' + esc(h.dok_nr) +
+          (typ === "verein" ? '<p class="klein" style="margin:6px 0 8px">' + (aktiv ? anzW + " Position(en) werden kontrolliert und ins Protokoll aufgenommen."
+            : anzW + " Position(en) – bei mehreren Verantwortlichen sind die Waffen oft nicht hier. Sie stehen nur im Protokoll, wenn du sie aufnimmst.") + '</p>' +
+            '<button type="button" class="btn ' + (aktiv ? "sec" : "") + ' klein" data-wbk="' + esc(WK.wbkSchluessel(h.dok_nr)) + '">' + (aktiv ? "Waffen sind nicht hier – wieder ausblenden" : "Waffen sind hier – kontrollieren") + '</button>' : "") + '</div>';
       }
+      if (!WK.positionAktiv(h, st.werte)) return;
       html += '<div class="card" data-gruppe="' + gi + '"><h3><span class="nr">' + esc(g.nr) + '</span>' + esc(h.hersteller) + ' · ' + esc(h.waffenart) +
         '<span class="muted klein"> (Kat. ' + esc(h.kategorie) + ', ' + esc(h.kaliber) + ')</span></h3>';
       haupt.forEach(function (x) { html += zeile(x); });
@@ -14752,6 +14792,9 @@ var qrcode = function() {
     });
     el.innerHTML = html;
     teileStand();
+    el.querySelectorAll("[data-wbk]").forEach(function (b) {
+      b.onclick = function () { var k = b.getAttribute("data-wbk"); st.werte[k] = st.werte[k] === "Ja" ? "" : "Ja"; speichern(); schrittWaffen(el); navAktualisieren(); };
+    });
     el.querySelectorAll("[data-snk]").forEach(function (b) {
       b.onclick = function () { var f = b.closest(".was").querySelector(".sn-feld"); f.classList.remove("versteckt"); f.focus(); };
     });
@@ -14790,7 +14833,7 @@ var qrcode = function() {
       el.querySelectorAll(".dok-kopf").forEach(function (k) { k.classList.toggle("versteckt", !!q); });
     };
     $("alleJa").onclick = function () {
-      d.items.forEach(function (it, i) { if (!st.werte["pos" + pos(i) + "_vorhanden"]) st.werte["pos" + pos(i) + "_vorhanden"] = "Ja"; });
+      d.items.forEach(function (it, i) { if (WK.positionAktiv(it, st.werte) && !st.werte["pos" + pos(i) + "_vorhanden"]) st.werte["pos" + pos(i) + "_vorhanden"] = "Ja"; });
       speichern(); schrittWaffen(el); navAktualisieren();
     };
   }
@@ -14806,10 +14849,11 @@ var qrcode = function() {
 
   // ---------- Schritt 3
   function schrittMunition(el) {
-    var kl = WK.kaliberListe(st.daten);
+    var kl = WK.kaliberListe(st.daten, st.werte);
     var html = '<h2>Munition</h2><div class="card"><h3>Kaliber laut Stammdatenblatt</h3>';
-    if (!kl.kaliber.length) html += '<p class="muted">Keine Kaliber eingetragen.</p>';
+    if (kl.kaliber.length === Object.keys(kl.aus).length) html += '<p class="muted">Keine Kaliber eingetragen.</p>';
     kl.kaliber.forEach(function (k, i) {
+      if (kl.aus[k]) return;
       html += '<div class="zeile"><div class="was"><b>' + esc(k) + '</b><span class="muted klein">Waffe Nr. ' + esc(kl.kalNr[k].join(", ")) + '</span></div>' +
         jnHtml("mun" + pos(i) + "_vorhanden") + '</div>';
     });
@@ -14857,7 +14901,7 @@ var qrcode = function() {
     return p;
   }
   function fehlendeTeile() {
-    return verweigert() ? [] : st.daten.items.filter(function (it, i) { return st.werte["pos" + pos(i) + "_vorhanden"] === "Nein"; });
+    return verweigert() ? [] : st.daten.items.filter(function (it, i) { return WK.positionAktiv(it, st.werte) && st.werte["pos" + pos(i) + "_vorhanden"] === "Nein"; });
   }
   function inhaltStand() {
     var w = Object.assign({}, st.werte); delete w.name_besitzer; delete w.name_kontrolleur; delete w.kontrolle_bis;
