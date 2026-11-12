@@ -55,6 +55,8 @@
   .zeile .was { flex:1; min-width:200px; }
   .zeile .was b { display:block; }
   .zeile .was > span { display:block; }
+  .dok-kopf { margin:18px 2px 8px; padding:8px 12px; border-left:4px solid var(--accent, #1f5fa8); background:#f3f6fa; border-radius:6px; }
+  .dok-kopf span { display:block; }
   .teil { padding-left:18px; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip { border:1px solid #b9c4d2; background:#fff; border-radius:999px; padding:10px 16px; min-height:44px; font-size:15px; font-weight:600; color:var(--muted); cursor:pointer; }
@@ -12928,6 +12930,8 @@ var qrcode = function() {
       });
     });
 
+    // Europäischer Feuerwaffenpass und Kleiner Waffenschein: nicht aufführen, auch nicht die Waffen darin (stehen ohnehin auf der WBK)
+    docs = docs.filter(function (x) { return !/Feuerwaffenpass|Kleiner\s*Waffenschein/i.test(x.art); });
     // --- Waffen je Dokument gruppieren: Nr. 1, 2, … = Waffen/Teile im Besitz; Nr. 0 = zusammengefügte Teile einer Waffe (gleiche Seriennummer)
     var mitWaffen = docs.filter(function (x) { return x.items.some(function (it) { return !it.ausgetragen; }); });
     var mehrere = mitWaffen.length > 1;
@@ -12940,26 +12944,27 @@ var qrcode = function() {
       var snN = function (x) { return String(x || "").toUpperCase().replace(/[\s\-\/\.]/g, ""); };
       haupt.forEach(function (h) {
         var hn = h.nr || "0", g = mehrere ? hn + " (" + doc.dok_nr + ")" : hn, istWaffe = /^W/.test(h.nwr);
-        var gk = hn === "0" ? g + "#" + (++nullNr) : g;
-        d.items.push({ nr: g, gruppe: gk, art: istWaffe ? "Waffe" : h.text, nwr: h.nwr, waffenart: h.text || (istWaffe ? "Waffe" : ""), kategorie: h.kat, ausfuehrung: "",
+        var gk = doc.dok_nr + "|" + hn + (hn === "0" ? "#" + (++nullNr) : "");
+        d.items.push({ nr: hn, nrText: g, gruppe: gk, dok_nr: doc.dok_nr, dok_art: doc.art, art: istWaffe ? "Waffe" : h.text, nwr: h.nwr, waffenart: h.text || (istWaffe ? "Waffe" : ""), kategorie: h.kat, ausfuehrung: "",
           kaliber: h.kaliber, hersteller: h.hersteller, seriennr: h.seriennr, erwerb: h.erwerb });
         if (!istWaffe) return;
         teile.filter(function (t) { return !t.zugeordnet && snN(t.seriennr) && snN(t.seriennr) === snN(h.seriennr); }).forEach(function (t) {
           t.zugeordnet = true;
-          d.items.push({ nr: "", gruppe: gk, art: t.text || "Waffenteil", nwr: t.nwr, waffenart: h.text, kategorie: t.kat, ausfuehrung: "",
+          d.items.push({ nr: "", nrText: g, gruppe: gk, dok_nr: doc.dok_nr, dok_art: doc.art, art: t.text || "Waffenteil", nwr: t.nwr, waffenart: h.text, kategorie: t.kat, ausfuehrung: "",
             kaliber: t.kaliber, hersteller: t.hersteller, seriennr: t.seriennr, erwerb: t.erwerb });
         });
       });
       teile.filter(function (t) { return !t.zugeordnet; }).forEach(function (t) {
         // einzelnes Waffenteil (z. B. Wechselsystem) ohne passende Waffe: eigene Position
-        var g = (t.nr || "0") + (mehrere ? " (" + doc.dok_nr + ")" : "");
-        d.items.push({ nr: g, gruppe: g + "#" + (++nullNr), art: t.text || "Waffenteil", nwr: t.nwr, waffenart: t.text || "Waffenteil", kategorie: t.kat, ausfuehrung: "",
+        var tn = t.nr || "0", g = tn + (mehrere ? " (" + doc.dok_nr + ")" : "");
+        d.items.push({ nr: tn, nrText: g, gruppe: doc.dok_nr + "|" + tn + "#" + (++nullNr), dok_nr: doc.dok_nr, dok_art: doc.art, art: t.text || "Waffenteil", nwr: t.nwr, waffenart: t.text || "Waffenteil", kategorie: t.kat, ausfuehrung: "",
           kaliber: t.kaliber, hersteller: t.hersteller, seriennr: t.seriennr, erwerb: t.erwerb });
       });
     });
     var haupt = mitWaffen[0] || docs[0] || {};
     d.dok_nr = haupt.dok_nr || ""; d.erlaubnis = haupt.art || ""; d.erlaubnis_nwr = haupt.nwr || ""; d.behoerde = haupt.behoerde || "";
-    var andere = docs.filter(function (x) { return x !== haupt; });
+    // weitere Erlaubnisse; alte Papier-WBK ohne NWR-ID und ohne Waffen im Besitz weglassen
+    var andere = docs.filter(function (x) { return x !== haupt && (x.nwr || mitWaffen.indexOf(x) >= 0); });
     if (andere.length) d.erlaubnis += "; außerdem " + andere.map(function (x) { return x.art + " (" + x.dok_nr + ")"; }).join(", ");
     d.erlaubnisse = docs.map(function (x) { return { dok_nr: x.dok_nr, art: x.art, nwr: x.nwr, status: x.status }; });
 
@@ -13328,9 +13333,17 @@ var qrcode = function() {
     }
     tabKopf();
     var zh = 30;
+    var letzteDok = null;
     d.items.forEach(function (it, k) {
       var idx = k + 1, pos = ("0" + idx).slice(-2);
-      if (y - zh < 30 * mm) { neueSeite(); tabKopf(); }
+      if (y - zh - (it.dok_nr && it.dok_nr !== letzteDok ? 16 : 0) < 30 * mm) { neueSeite(); tabKopf(); }
+      if (it.dok_nr && it.dok_nr !== letzteDok) {
+        // Zwischenzeile: auf welcher Erlaubnis (WBK) die folgenden Waffen eingetragen sind
+        letzteDok = it.dok_nr;
+        page.drawRectangle({ x: RAND, y: y - 14, width: W - 2 * RAND, height: 14, color: rgb(0.97, 0.975, 0.985) });
+        txt(RAND + 3, y - 10, fit("Eingetragen auf: " + (it.dok_art || "Erlaubnis") + ", Dokument Nr. " + it.dok_nr, F.b, 8, W - 2 * RAND - 6), F.b, 8, DUNKEL);
+        y -= 16;
+      }
       var haupt = !!it.nr, t = y, fb = haupt ? F.b : F.n, einr = haupt ? 0 : 8;
       if (haupt && idx > 1) linie(RAND, t + 2, W - RAND, t + 2, 0.8, DUNKEL);
       txt(xs[0] + 3, t - 10, it.nr, F.b, 9);
@@ -13633,7 +13646,8 @@ var qrcode = function() {
       var k = (it.kaliber || "").trim();
       if (!k || /^ohne$/i.test(k)) return;
       if (!kalNr[k]) { kalNr[k] = []; kaliber.push(k); }
-      if (it.gruppe && kalNr[k].indexOf(it.gruppe) < 0) kalNr[k].push(it.gruppe);
+      var nrT = it.nrText || it.gruppe;
+      if (nrT && kalNr[k].indexOf(nrT) < 0) kalNr[k].push(nrT);
     });
     return { kaliber: kaliber, kalNr: kalNr };
   }
@@ -14717,8 +14731,13 @@ var qrcode = function() {
       '<input class="suche" id="snSuche" type="search" inputmode="search" autocomplete="off" placeholder="🔍 Seriennummer suchen …">' +
       '<div id="snKeine" class="hinweisbox warn versteckt">Keine Waffe / kein Waffenteil mit dieser Seriennummer im Stammdatenblatt.</div>' +
       '<p class="muted klein" style="margin-top:0">Für jede Position antippen, ob sie vorhanden ist. Bemerkung nur bei Bedarf.</p>';
+    var letzteDok = null;
     gruppen.forEach(function (g, gi) {
       var h = g.items[0].it, haupt = g.items[0].it.nr ? [g.items[0]] : [], teile = g.items.slice(haupt.length);
+      if (h.dok_nr && h.dok_nr !== letzteDok) {
+        letzteDok = h.dok_nr;
+        html += '<div class="dok-kopf"><span class="muted klein">Eingetragen auf</span><b>' + esc(h.dok_art || "Erlaubnis") + '</b> · Dokument Nr. ' + esc(h.dok_nr) + '</div>';
+      }
       html += '<div class="card" data-gruppe="' + gi + '"><h3><span class="nr">' + esc(g.nr) + '</span>' + esc(h.hersteller) + ' · ' + esc(h.waffenart) +
         '<span class="muted klein"> (Kat. ' + esc(h.kategorie) + ', ' + esc(h.kaliber) + ')</span></h3>';
       haupt.forEach(function (x) { html += zeile(x); });
@@ -14768,6 +14787,7 @@ var qrcode = function() {
         }
       });
       $("snKeine").classList.toggle("versteckt", !q || treffer > 0);
+      el.querySelectorAll(".dok-kopf").forEach(function (k) { k.classList.toggle("versteckt", !!q); });
     };
     $("alleJa").onclick = function () {
       d.items.forEach(function (it, i) { if (!st.werte["pos" + pos(i) + "_vorhanden"]) st.werte["pos" + pos(i) + "_vorhanden"] = "Ja"; });
