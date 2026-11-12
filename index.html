@@ -13005,14 +13005,25 @@ var qrcode = function() {
   function auswerten(seiten) {
     var d = istPersonendaten(seiten) ? personendatenAuswerten(seiten) : stammdatenAuswerten(seiten);
     // Hinweis auf einen Verwahrvertrag (Waffen einer anderen Person hier verwahrt bzw. eigene Waffen bei anderen): ganze Zeile merken
-    var hinweise = [];
+    // Block im NWR-Ausdruck: "Verwahrungsvertrag / Person: … / Gültig von: … / Langwaffen: … Kurzwaffen: …"
+    var hinweise = [], personen = [];
     seiten.forEach(function (seite) {
-      zeilen(seite.words).forEach(function (z) {
+      var zz = zeilen(seite.words);
+      zz.forEach(function (z, i) {
         var t = text(z.ws);
-        if (/verwahr/i.test(t) && hinweise.indexOf(t) < 0) hinweise.push(t);
+        if (!/verwahr/i.test(t)) return;
+        var teile = [], person = "";
+        for (var j = i + 1; j < zz.length && j <= i + 4 && zz[j].top - zz[j - 1].top < 22; j++) {
+          var tj = text(zz[j].ws);
+          if (/^Geprüft/i.test(tj) || /verwahr/i.test(tj)) break;
+          var m = /^Person:\s*(.+)$/i.exec(tj);
+          if (m) { person = m[1].trim(); teile.push("mit " + person); }
+        }
+        var h = teile.length ? teile.join(" · ") : t;
+        if (hinweise.indexOf(h) < 0) { hinweise.push(h); if (person) personen.push(person); }
       });
     });
-    if (hinweise.length) d.verwahrvertrag = hinweise;
+    if (hinweise.length) { d.verwahrvertrag = hinweise; d.verwahrPersonen = personen; }
     return d;
   }
   // Vorbelegung für die Aufbewahrung aus den Behältnisdaten
@@ -14280,7 +14291,7 @@ var qrcode = function() {
         '<div class="info"><b>' + esc(d.person[0] || "") + '</b>' + (WK.aktenzeichenAus(d) ? ' <span class="az">Az. ' + esc(WK.aktenzeichenAus(d)) + '</span>' : "") + (d.verwahrvertrag ? ' <span class="az rot" title="' + esc(d.verwahrvertrag.join(" | ")) + '">Verwahrvertrag</span>' : "") +
         '<div class="zeile2">' + esc(adr) + "</div>" +
         '<div class="zeile2">' + anz + " Waffe(n) · Dok-Nr. " + esc(d.dok_nr || "") + "</div>" + zeile3 +
-        (d.verwahrvertrag ? '<div class="vv-box"><b>Verwahrvertrag:</b> ' + esc(d.verwahrvertrag.join(" · ")) + ' – andere Person ggf. direkt mit kontrollieren.</div>' : "") + "</div>" +
+        (d.verwahrvertrag ? '<div class="vv-box"><b>Verwahrvertrag</b> ' + esc(d.verwahrvertrag.join(" / ")) + ' – ' + verwahrInListe(d) + '</div>' : "") + "</div>" +
         '<div class="aktionen">' + akt + '<button class="x" title="Aus Liste entfernen" data-akt="weg" data-i="' + i + '">×</button></div></li>';
     }).join("");
   }
@@ -14304,6 +14315,16 @@ var qrcode = function() {
     if (!(await frage("Ganze Liste leeren?" + (offen ? " " + offen + " Kontrolle(n) sind noch nicht abgeschlossen." : "") + " Fertige PDFs vorher sichern!", "Leeren", true))) return;
     liste.forEach(function (p) { dbDel(p.id); }); liste = []; listeZeigen(); meldung($("startMeldung"), "", "");
   };
+  // Ist die Person aus dem Verwahrvertrag auch in der Liste? (Vergleich über Vor- und Nachname)
+  function verwahrInListe(d) {
+    var namen = (d.verwahrPersonen || []).map(function (n) { return n.toLowerCase().replace(/\s+/g, " ").trim(); });
+    if (!namen.length) return "andere Person ggf. direkt mit kontrollieren.";
+    var treffer = liste.filter(function (q) {
+      var n = String(q.daten.person[0] || "").toLowerCase().replace(/\s+/g, " ").trim();
+      return q.daten !== d && namen.some(function (x) { return x === n || x.split(" ").reverse().join(" ") === n; });
+    });
+    return treffer.length ? "<b>ist auch in der Liste</b> – direkt mit kontrollieren." : "andere Person ggf. direkt mit kontrollieren.";
+  }
   function b64(bytes) { var s = "", c = 0x8000; for (var i = 0; i < bytes.length; i += c) s += String.fromCharCode.apply(null, bytes.subarray(i, i + c)); return btoa(s); }
 
   // ---------- QR-Übertragung (offline). Hin: PC -> iPad (Tour). Zurück: iPad -> PC (Ergebnisse).
