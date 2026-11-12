@@ -147,7 +147,7 @@
   .qr-ov canvas.code { image-rendering:pixelated; width:min(78vh, 92vw); height:min(78vh, 92vw); }
   .qr-ov video { width:min(92vw, 640px); max-height:60vh; border-radius:14px; background:#000; object-fit:cover; }
   .qr-punkte { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
-  .qr-punkte span { width:22px; height:22px; border-radius:6px; background:#dde3ea; font-size:12px; line-height:22px; color:#57657a; }
+  .qr-punkte span { width:30px; height:30px; border-radius:6px; background:#dde3ea; font-size:14px; line-height:30px; color:#57657a; cursor:pointer; }
   .qr-punkte span.ok { background:var(--ok); color:#fff; }
   .qr-punkte span.jetzt { outline:3px solid var(--accent, #1f5fa8); }
   .modal { position:fixed; inset:0; z-index:50; background:rgba(15,25,40,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
@@ -14273,8 +14273,10 @@ var qrcode = function() {
       '<p class="muted klein" style="margin:0">' + unten + '</p>');
     var cv = ov.querySelector("canvas"), punkte = ov.querySelector(".qr-punkte"), idx = 0, pause = false;
     punkte.innerHTML = teile.map(function (t, i) { return "<span>" + (i + 1) + "</span>"; }).join("");
+    var runde = 0;
     function zeichnen() {
-      var qr = qrcode(0, "L"); qr.addData(teile[idx], "Byte"); qr.make();
+      // jede zweite Runde mit anderer Fehlerkorrektur: anderes Muster, falls ein Code schlecht lesbar ist
+      var qr = qrcode(0, runde % 2 ? "M" : "L"); qr.addData(teile[idx], "Byte"); qr.make();
       var m = qr.getModuleCount(), rand = 4, g = m + 2 * rand;
       cv.width = g; cv.height = g;
       var c = cv.getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0, 0, g, g); c.fillStyle = "#000";
@@ -14282,8 +14284,11 @@ var qrcode = function() {
       punkte.querySelectorAll("span").forEach(function (s, i) { s.classList.toggle("jetzt", i === idx); });
     }
     zeichnen();
-    var timer = setInterval(function () { if (!pause && teile.length > 1) { idx = (idx + 1) % teile.length; zeichnen(); } }, 1000);
+    var pauseBtn = ov.querySelector('[data-q="pause"]');
+    var timer = setInterval(function () { if (!pause && teile.length > 1) { idx = (idx + 1) % teile.length; if (!idx) runde++; zeichnen(); } }, 1000);
     ov.addEventListener("click", function (e) {
+      var nr = e.target.closest && e.target.closest(".qr-punkte span");
+      if (nr) { idx = Array.prototype.indexOf.call(punkte.children, nr); pause = true; pauseBtn.textContent = "Weiter"; runde++; zeichnen(); return; }
       var q = e.target.getAttribute && e.target.getAttribute("data-q");
       if (q === "pause") { pause = !pause; e.target.textContent = pause ? "Weiter" : "Pause"; }
       if (q === "zu") { clearInterval(timer); ov.remove(); }
@@ -14299,20 +14304,30 @@ var qrcode = function() {
       '<button class="btn sec" type="button" data-q="zu">Abbrechen</button>');
     var video = ov.querySelector("video"), punkte = ov.querySelector(".qr-punkte"), status = ov.querySelector("[data-status]");
     var cv = document.createElement("canvas"), ctx = cv.getContext("2d", { willReadFrequently: true });
-    var stream = null, laeuft = true, kennung = null, teile = [], n = 0;
+    var stream = null, laeuft = true, kennung = null, teile = [], n = 0, durchlauf = 0;
     var re = new RegExp("^" + prefix + "\\|([a-z0-9]+)\\|(\\d+)\\|(\\d+)\\|([\\s\\S]*)$");
     function ende() { laeuft = false; if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); ov.remove(); }
     ov.addEventListener("click", function (e) { if (e.target.getAttribute && e.target.getAttribute("data-q") === "zu") ende(); });
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
     } catch (e) { ende(); hinweis("Kein Zugriff auf die Kamera. Bitte die Kamera für diese Seite erlauben."); return; }
     video.srcObject = stream; try { await video.play(); } catch (e) {}
     function schritt() {
       if (!laeuft) return;
       if (video.readyState >= 2 && video.videoWidth) {
-        var f = Math.min(1, 1000 / Math.max(video.videoWidth, video.videoHeight));
-        cv.width = Math.round(video.videoWidth * f); cv.height = Math.round(video.videoHeight * f);
-        ctx.drawImage(video, 0, 0, cv.width, cv.height);
+        var vw = video.videoWidth, vh = video.videoHeight;
+        durchlauf++;
+        if (durchlauf % 2) {
+          // ganzes Bild, verkleinert
+          var f = Math.min(1, 1000 / Math.max(vw, vh));
+          cv.width = Math.round(vw * f); cv.height = Math.round(vh * f);
+          ctx.drawImage(video, 0, 0, cv.width, cv.height);
+        } else {
+          // Bildmitte in voller Auflösung: größere Punkte, liest auch dichte Codes
+          var q = Math.min(vw, vh, 1100);
+          cv.width = q; cv.height = q;
+          ctx.drawImage(video, (vw - q) / 2, (vh - q) / 2, q, q, 0, 0, q, q);
+        }
         var code = jsQR(ctx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: "dontInvert" });
         var m = code && re.exec(code.data);
         if (m) {
@@ -14332,7 +14347,7 @@ var qrcode = function() {
           }
         }
       }
-      setTimeout(schritt, 120);
+      setTimeout(schritt, 60);
     }
     schritt();
   }
@@ -14346,7 +14361,7 @@ var qrcode = function() {
       bescheid: vorlageFuerQr(false),
       personen: offen.map(function (p) { return { id: p.id, daten: p.daten, werte: p.werte, reihenfolge: p.reihenfolge }; }) };
     qrAnzeigen("WKQ1", tour, "Tour mit " + offen.length + " Person(en) – auf dem iPad „Tour per QR-Code scannen“ antippen und hierauf richten",
-      "Die Codes wechseln automatisch. Das Stammdatenblatt selbst bleibt am PC." + (tour.bescheid ? " Diesmal ist die Kostenbescheid-Vorlage mit dabei (nur beim ersten Mal bzw. nach Änderungen)." : ""), 1200);
+      "Die Codes wechseln automatisch. Fehlt einer, die Nummer antippen – der Code bleibt dann stehen. Das Stammdatenblatt selbst bleibt am PC." + (tour.bescheid ? " Diesmal ist die Kostenbescheid-Vorlage mit dabei (nur beim ersten Mal bzw. nach Änderungen)." : ""), 800);
   };
   // Vorlage nur mitschicken, wenn sie noch nicht (in dieser Fassung) ans iPad ging – spart viele Codes
   function vorlageFuerQr(immer) {
