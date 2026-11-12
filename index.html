@@ -54,6 +54,7 @@
   .zeile:first-of-type { border-top:0; }
   .zeile .was { flex:1; min-width:200px; }
   .zeile .was b { display:block; }
+  .zeile .was > span { display:block; }
   .teil { padding-left:18px; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip { border:1px solid #b9c4d2; background:#fff; border-radius:999px; padding:10px 16px; min-height:44px; font-size:15px; font-weight:600; color:var(--muted); cursor:pointer; }
@@ -12895,7 +12896,7 @@ var qrcode = function() {
       if (!spalten) return;
       var sp = spalten;
       var anker = ws.filter(function (w) { return w.x0 >= sp.nwr && NWR_ITEM.test(w.text); }).sort(function (a, b) { return a.top - b.top; });
-      anker.forEach(function (a) {
+      anker.forEach(function (a, ai) {
         var doc = null;
         dokAuf.forEach(function (x) { if (x.top < a.top) doc = x; });
         if (!doc) doc = aktDoc;
@@ -12917,8 +12918,13 @@ var qrcode = function() {
         var artZ = sp2(sp.art, sp.kal), her = sp2(sp.her, sp.sn), aus = sp2(sp.aus, sp.st).join(" ").trim();
         var artText = artZ.join(" ").replace(/\s+/g, " ").trim(), kat = "", m = /^Kat\.?\s*([A-D0-9]{1,2})\b\s*(.*)$/.exec(artText);
         if (m) { kat = m[1]; artText = m[2].trim(); }
+        // "Erwerb von: …" steht in den Zeilen unter dem Eintrag (bis zum nächsten Eintrag / Dokument)
+        var bisTop = Math.min(ai + 1 < anker.length ? anker[ai + 1].top - 2 : 1e9, a.top + 70);
+        marker.forEach(function (m) { if (m.top > a.top && m.top < bisTop) bisTop = m.top; });
+        var erw = ws.filter(function (w) { return w.top > a.top + 12 && w.top < bisTop && /^Erwerb von:/.test(w.text); })[0];
         doc.items.push({ nr: nr, kat: kat, text: artText, kaliber: sp2(sp.kal, sp.her).join(" ").trim(), hersteller: her.join(", "),
-          seriennr: sp2(sp.sn, sp.aus).join(" ").trim(), status: sp2(sp.st, sp.nwr).join(" ").trim(), ausgetragen: !!aus, nwr: a.text });
+          seriennr: sp2(sp.sn, sp.aus).join(" ").trim(), status: sp2(sp.st, sp.nwr).join(" ").trim(), ausgetragen: !!aus, nwr: a.text,
+          erwerb: erw ? erw.text.replace(/^Erwerb von:\s*/, "").trim() : "" });
       });
     });
 
@@ -12927,24 +12933,28 @@ var qrcode = function() {
     var mehrere = mitWaffen.length > 1;
     mitWaffen.forEach(function (doc) {
       var aktiv = doc.items.filter(function (it) { return !it.ausgetragen; });
-      var haupt = aktiv.filter(function (it) { return it.nr && it.nr !== "0"; });
-      var teile = aktiv.filter(function (it) { return !it.nr || it.nr === "0"; });
+      // Nr. 0 mit Waffen-NWR-ID (W…) ist eine eigenständige Waffe; nur Teile (T…) werden einer Waffe mit gleicher Seriennummer zugeordnet
+      var haupt = aktiv.filter(function (it) { return (it.nr && it.nr !== "0") || /^W/.test(it.nwr); });
+      var teile = aktiv.filter(function (it) { return haupt.indexOf(it) < 0; });
+      var nullNr = 0;
       var snN = function (x) { return String(x || "").toUpperCase().replace(/[\s\-\/\.]/g, ""); };
       haupt.forEach(function (h) {
-        var g = mehrere ? h.nr + " (" + doc.dok_nr + ")" : h.nr, istWaffe = /^W/.test(h.nwr);
-        d.items.push({ nr: g, gruppe: g, art: istWaffe ? "Waffe" : h.text, nwr: h.nwr, waffenart: h.text, kategorie: h.kat, ausfuehrung: "",
-          kaliber: h.kaliber, hersteller: h.hersteller, seriennr: h.seriennr });
+        var hn = h.nr || "0", g = mehrere ? hn + " (" + doc.dok_nr + ")" : hn, istWaffe = /^W/.test(h.nwr);
+        var gk = hn === "0" ? g + "#" + (++nullNr) : g;
+        d.items.push({ nr: g, gruppe: gk, art: istWaffe ? "Waffe" : h.text, nwr: h.nwr, waffenart: h.text || (istWaffe ? "Waffe" : ""), kategorie: h.kat, ausfuehrung: "",
+          kaliber: h.kaliber, hersteller: h.hersteller, seriennr: h.seriennr, erwerb: h.erwerb });
         if (!istWaffe) return;
         teile.filter(function (t) { return !t.zugeordnet && snN(t.seriennr) && snN(t.seriennr) === snN(h.seriennr); }).forEach(function (t) {
           t.zugeordnet = true;
-          d.items.push({ nr: "", gruppe: g, art: t.text, nwr: t.nwr, waffenart: h.text, kategorie: t.kat, ausfuehrung: "",
-            kaliber: t.kaliber, hersteller: t.hersteller, seriennr: t.seriennr });
+          d.items.push({ nr: "", gruppe: gk, art: t.text || "Waffenteil", nwr: t.nwr, waffenart: h.text, kategorie: t.kat, ausfuehrung: "",
+            kaliber: t.kaliber, hersteller: t.hersteller, seriennr: t.seriennr, erwerb: t.erwerb });
         });
       });
       teile.filter(function (t) { return !t.zugeordnet; }).forEach(function (t) {
-        var g = "0" + (mehrere ? " (" + doc.dok_nr + ")" : "");
-        d.items.push({ nr: g, gruppe: g, art: t.text, nwr: t.nwr, waffenart: t.text, kategorie: t.kat, ausfuehrung: "",
-          kaliber: t.kaliber, hersteller: t.hersteller, seriennr: t.seriennr });
+        // einzelnes Waffenteil (z. B. Wechselsystem) ohne passende Waffe: eigene Position
+        var g = (t.nr || "0") + (mehrere ? " (" + doc.dok_nr + ")" : "");
+        d.items.push({ nr: g, gruppe: g + "#" + (++nullNr), art: t.text || "Waffenteil", nwr: t.nwr, waffenart: t.text || "Waffenteil", kategorie: t.kat, ausfuehrung: "",
+          kaliber: t.kaliber, hersteller: t.hersteller, seriennr: t.seriennr, erwerb: t.erwerb });
       });
     });
     var haupt = mitWaffen[0] || docs[0] || {};
@@ -14684,16 +14694,20 @@ var qrcode = function() {
   function schrittWaffen(el) {
     var d = st.daten, gruppen = [], cur = null;
     d.items.forEach(function (it, i) {
-      if (!cur || (it.gruppe || it.nr) !== cur.nr) { cur = { nr: it.gruppe || it.nr, items: [] }; gruppen.push(cur); }
+      if (!cur || (it.gruppe || it.nr) !== cur.key) { cur = { key: it.gruppe || it.nr, nr: it.nr || String(it.gruppe || "").split("#")[0], items: [] }; gruppen.push(cur); }
       cur.items.push({ it: it, i: i });
     });
     function zeile(x) {
       var it = x.it, n = "pos" + pos(x.i);
       var neu = String(st.werte[n + "_sn_neu"] || "").trim(), korr = !!neu && neu !== it.seriennr;
-      return '<div class="zeile' + (it.nr ? "" : " teil") + '" data-sn="' + esc(snNorm(it.seriennr) + " " + snNorm(it.nwr) + " " + snNorm(neu)) + '"><div class="was"><b>' + esc(it.art) + '</b>' +
+      var artTxt = it.art === "Waffe" && it.waffenart && it.waffenart !== "Waffe" ? "Waffe – " + it.waffenart : it.art;
+      var info = [it.kategorie ? "Kat. " + it.kategorie : "", it.kaliber, it.hersteller].filter(Boolean).join(" · ");
+      return '<div class="zeile' + (it.nr ? "" : " teil") + '" data-sn="' + esc(snNorm(it.seriennr) + " " + snNorm(it.nwr) + " " + snNorm(neu)) + '"><div class="was"><b>' + esc(artTxt) + '</b>' +
+        (info ? '<span class="klein">' + esc(info) + '</span>' : "") +
         '<span class="muted klein">Seriennr. <b class="sn-orig' + (korr ? " sn-alt" : "") + '" style="display:inline;color:var(--text)">' + esc(it.seriennr) + '</b>' +
         '<b class="sn-neu" data-snanz="' + n + '" style="display:inline;padding-left:6px">' + (korr ? esc(neu) : "") + '</b>' +
-        '<button type="button" class="snk" data-snk="' + n + '">' + (korr ? "ändern" : "korrigieren") + '</button> · ' + esc(it.nwr) + '</span>' +
+        '<button type="button" class="snk" data-snk="' + n + '">' + (korr ? "ändern" : "korrigieren") + '</button> · NWR-ID ' + esc(it.nwr) + '</span>' +
+        (it.erwerb ? '<span class="muted klein">Erwerb von: ' + esc(it.erwerb) + '</span>' : "") +
         '<input class="bem sn-feld' + (korr ? "" : " versteckt") + '" data-name="' + n + '_sn_neu" data-snalt="' + esc(it.seriennr) + '" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Richtige Seriennummer eintragen (leer = stimmt)" value="' + esc(neu) + '">' +
         '<input class="bem" data-name="' + n + '_bemerkung" placeholder="Bemerkung (optional)" value="' + esc(st.werte[n + "_bemerkung"] || "") + '"></div>' +
         jnHtml(n + "_vorhanden") + '</div>';
